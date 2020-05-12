@@ -35,6 +35,8 @@
 
 #include "gaussian_scale_space_pyramid.h"
 #include <framework/error.h>
+#include <emscripten/emscripten.h>
+#include "AR/ar.h"
 //#include <framework/logger.h>
 
 using namespace vision;
@@ -350,6 +352,49 @@ void BinomialPyramid32f::build(const Image& image) {
         // Apply binomial filters
         apply_filter(mPyramid[i*mNumScalesPerOctave+1], mPyramid[i*mNumScalesPerOctave]);
         apply_filter_twice(mPyramid[i*mNumScalesPerOctave+2], mPyramid[i*mNumScalesPerOctave+1]);
+    }
+
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG guassian pyramid start]. %d %d\n", mPyramid[0].width(), mPyramid[0].height());
+
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.pyramids) kimDebugData.pyramids = [];
+            if (!kimDebugData.pyramidOriginalImages) kimDebugData.pyramidOriginalImages = [];
+            kimDebugData.pyramids.push([]);
+            kimDebugData.pyramidOriginalImages.push({
+                width: a[0],
+                height: a[1],
+                values: []
+            });
+        }, image.width(), image.height());
+
+        for (int jj = 0; jj < image.width() * image.height(); jj++) {
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.pyramidOriginalImages[kimDebugData.pyramidOriginalImages.length-1].values.push(a[0]);
+            }, ((unsigned char*)image.get())[jj]);
+        }
+
+        for (int ii = 0; ii < mNumOctaves * mNumScalesPerOctave; ii++) {
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.pyramids[kimDebugData.pyramids.length-1].push({
+                    width: a[0],
+                    height: a[1],
+                    values: []
+                }); 
+            }, mPyramid[ii].width(), mPyramid[ii].height());
+
+            for (int jj = 0; jj < mPyramid[ii].width() * mPyramid[ii].height(); jj++) {
+                EM_ASM_({
+                    var a = arguments;
+                    kimDebugData.pyramids[kimDebugData.pyramids.length-1][ a[0]].values.push(a[1]);
+                }, ii, ((float*)mPyramid[ii].get())[jj]);
+            }
+        }
+        ARLOGi("[KIM DEBUG guassian pyramid] end");
     }
 }
 

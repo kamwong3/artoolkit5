@@ -41,6 +41,8 @@
 #include <algorithm>
 #include <functional>
 #include "interpolate.h"
+#include <emscripten/emscripten.h>
+#include "AR/ar.h"
 
 using namespace vision;
 
@@ -150,10 +152,66 @@ void DoGScaleInvariantDetector::detect(const GaussianScaleSpacePyramid* pyramid)
     TIMED("DoG Pyramid") {
         mLaplacianPyramid.compute(pyramid);
     }
-    
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start dog pyramid].\n");
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.dogPyramidImages) kimDebugData.dogPyramidImages = [];
+            kimDebugData.dogPyramidImages.push([]);
+        }, );
+
+        for(int i = 0; i < mLaplacianPyramid.numOctaves(); i++) {
+            for(int j = 0; j < mLaplacianPyramid.numScalePerOctave(); j++) {
+                Image& image = mLaplacianPyramid.get(i, j);
+                EM_ASM_({
+                    var a = arguments;
+                    kimDebugData.dogPyramidImages[kimDebugData.dogPyramidImages.length-1].push({
+                        width: a[0],
+                        height: a[1],
+                        values: []
+                    }); 
+                }, image.width(), image.height());
+
+                for (int k = 0; k < image.width() * image.height(); k++) {
+                    EM_ASM_({
+                        var a = arguments;
+                        var pyramids = kimDebugData.dogPyramidImages[kimDebugData.dogPyramidImages.length-1];
+                        pyramids[pyramids.length-1].values.push(a[0]);
+                    }, ((float*)image.get())[k]);
+                }
+            }
+        }
+        ARLOGi("[KIM DEBUG end dog pyramid]");
+    } 
+
     // Detect minima and maximum in Laplacian images
     TIMED("Non-max suppression") {
         extractFeatures(pyramid, &mLaplacianPyramid);
+    }
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start mfeaturePoints].\n");
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.featurePoints) kimDebugData.featurePoints = [];
+            kimDebugData.featurePoints.push([]);
+        }, );
+        for(int i = 0; i < mFeaturePoints.size(); i++) {
+            FeaturePoint& kp = mFeaturePoints[i];
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.featurePoints[kimDebugData.featurePoints.length-1].push({
+                    x: a[0],
+                    y: a[1],
+                    octave: a[2],
+                    scale: a[3],
+                    score: a[4],
+                    sigma: a[5]
+                });
+            }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma);
+        }
+        ARLOGi("[KIM DEBUG end mfeaturePoints]");
     }
     
     // Sub-pixel refinement

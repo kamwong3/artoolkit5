@@ -41,6 +41,7 @@
 #include <stdlib.h>
 #include <AR2/config.h>
 #include <AR2/featureSet.h>
+#include <emscripten/emscripten.h>
 
 static int make_template( ARUint8 *imageBW, int xsize, int ysize,
                           int cx, int cy, int ts1, int ts2, float  sd_thresh,
@@ -223,6 +224,28 @@ AR2FeatureMapT *ar2GenFeatureMap( AR2ImageT *image,
                 fp2++;
                 continue;
             }
+            
+            /*
+            if (KIM_DEBUG) {
+                EM_ASM_({
+                    var a = arguments;
+                    kimDebugData.templates[kimDebugData.templates.length-1].points.push({
+                        x: a[0],
+                        y: a[1],
+                        values: []
+                    });
+                }, i, j);
+
+                for (int ii = 0; ii < (ts1+ts2+1) * (ts1+ts2+1); ii++) {
+                    EM_ASM_({
+                        var a = arguments;
+                        var i = kimDebugData.templates.length - 1;
+                        var k = kimDebugData.templates[i].points.length - 1;
+                        kimDebugData.templates[i].points[k].values.push(a[0]);
+                    }, (float)*(template + ii));
+                }
+            }
+            */
 
             max = -1.0f;
             for( jj = -search_size1; jj <= search_size1; jj++ ) {
@@ -405,6 +428,8 @@ AR2FeatureCoordT *ar2SelectFeature2( AR2ImageT *image, AR2FeatureMapT *featureMa
     if( image->xsize != featureMap->xsize || image->ysize != featureMap->ysize ) return NULL;
 
     occ_size *= 2;
+
+    ARLOGi("select feature params = %d %d %d %f %f %f\n", ts1, ts2, occ_size, max_sim_thresh, min_sim_thresh, sd_thresh);
 
     xsize = image->xsize;
     ysize = image->ysize;
