@@ -41,6 +41,7 @@
 #include <math/polynomial.h>
 #include <math/math_utils.h>
 #include <math/math_io.h>
+#include "AR/ar.h"
 
 using namespace vision;
 
@@ -115,6 +116,9 @@ void OrientationAssignment::compute(float* angles,
     int x1, y1;
     float max_height;
     float gw_sigma, gw_scale;
+
+    //ARLOGi("[KIM DEBUG mNumBins] numbins: %d, gaussianexpansion: %f, supportRegionExpansion: %f, smooething iter: %d, mPeakThreshold: %f.\n", mNumBins, mGaussianExpansionFactor, mSupportRegionExpansionFactor, mNumSmoothingIterations, mPeakThreshold);
+
     
     ASSERT(x >= 0, "x must be positive");
     ASSERT(x < mGradients[octave*mNumScalesPerOctave+scale].width(), "x must be less than the image width");
@@ -146,6 +150,8 @@ void OrientationAssignment::compute(float* angles,
     // Radius of the support region
     radius  = mSupportRegionExpansionFactor*gw_sigma;
     radius2 = std::ceil(sqr(radius));
+
+    // ARLOGi("[KIM DEBUG] (x, y): (%f, %f), octave: %d, scale: %d, radius: %f, radius2: %f: gw_sigma: %f, gw_scale: %f \n", x, y, octave, scale, radius, radius2, gw_sigma, gw_scale);
     
     // Box around feature point
     x0 = xi-(int)(radius+0.5f);
@@ -164,13 +170,15 @@ void OrientationAssignment::compute(float* angles,
     
     // Build up the orientation histogram
     for(int yp = y0; yp <= y1; yp++) {
-        float dy = yp-y;
+        //float dy = yp-y;
+        float dy = yp-yi; //KIM FIX 
         float dy2 = sqr(dy);
         
         const float* y_ptr = g.get<float>(yp);
         
         for(int xp = x0; xp <= x1; xp++) {
-            float dx = xp-x;
+            //float dx = xp-x;
+            float dx = xp-xi; //KIM FIX 
             float r2 = sqr(dx)+dy2;
             
             // Only use the gradients within the circular window
@@ -181,6 +189,8 @@ void OrientationAssignment::compute(float* angles,
             const float* g = &y_ptr[xp<<1];
             const float& angle = g[0];
             const float& mag   = g[1];
+
+            // ARLOGi("[KIM DEBUG] gra angle: %d %d %d %d %d %d (%d %d) %f. mag: %f\n", xi, yi, x0, x1, y0, y1, xp, yp, angle, mag);
             
             // Compute the gaussian weight based on distance from center of keypoint
             float w = fastexp6(r2*gw_scale);

@@ -218,15 +218,94 @@ void DoGScaleInvariantDetector::detect(const GaussianScaleSpacePyramid* pyramid)
     TIMED("Subpixel") {
         findSubpixelLocations(pyramid);
     }
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start findSubpixelLocations mfeaturePoints].\n");
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.featurePoints2) kimDebugData.featurePoints2 = [];
+            kimDebugData.featurePoints2.push([]);
+        }, );
+        for(int i = 0; i < mFeaturePoints.size(); i++) {
+            FeaturePoint& kp = mFeaturePoints[i];
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.featurePoints2[kimDebugData.featurePoints2.length-1].push({
+                    x: a[0],
+                    y: a[1],
+                    octave: a[2],
+                    scale: a[3],
+                    score: a[4],
+                    sigma: a[5],
+                    edgeScore: a[6],
+                    spScale: a[7],
+                });
+            }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma, kp.edge_score, kp.sp_scale);
+        }
+        ARLOGi("[KIM DEBUG end  findSubpixelLocations mfeaturePoints]");
+    }
     
     // Prune features
     TIMED("pruneFeatures") {
         pruneFeatures();
     }
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start pruned mfeaturePoints].\n");
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.featurePoints3) kimDebugData.featurePoints3 = [];
+            kimDebugData.featurePoints3.push([]);
+        }, );
+        for(int i = 0; i < mFeaturePoints.size(); i++) {
+            FeaturePoint& kp = mFeaturePoints[i];
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.featurePoints3[kimDebugData.featurePoints3.length-1].push({
+                    x: a[0],
+                    y: a[1],
+                    octave: a[2],
+                    scale: a[3],
+                    score: a[4],
+                    sigma: a[5],
+                    edgeScore: a[6],
+                    spScale: a[7],
+                });
+            }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma, kp.edge_score, kp.sp_scale);
+        }
+        ARLOGi("[KIM DEBUG end pruned mfeaturePoints]");
+    }
     
     // Compute dominant angles
     TIMED("Find Orientations") {
         findFeatureOrientations(pyramid);
+    }
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start findFeatureOrientations mfeaturePoints].\n");
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.featurePoints4) kimDebugData.featurePoints4 = [];
+            kimDebugData.featurePoints4.push([]);
+        }, );
+        for(int i = 0; i < mFeaturePoints.size(); i++) {
+            FeaturePoint& kp = mFeaturePoints[i];
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.featurePoints4[kimDebugData.featurePoints4.length-1].push({
+                    x: a[0],
+                    y: a[1],
+                    octave: a[2],
+                    scale: a[3],
+                    score: a[4],
+                    sigma: a[5],
+                    edgeScore: a[6],
+                    spScale: a[7],
+                    angle: a[8],
+                });
+            }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma, kp.edge_score, kp.sp_scale, kp.angle);
+        }
+        ARLOGi("[KIM DEBUG end findFeatureOrientations mfeaturePoints]");
     }
 }
 
@@ -505,6 +584,7 @@ void DoGScaleInvariantDetector::extractFeatures(const GaussianScaleSpacePyramid*
 }
 
 void DoGScaleInvariantDetector::pruneFeatures() {
+    ARLOGi("[KIM DEBUG] maxNumFeaturePoints %d.\n", mMaxNumFeaturePoints);
     if(mFeaturePoints.size() <= mMaxNumFeaturePoints) {
         return;
     }
@@ -541,6 +621,17 @@ void DoGScaleInvariantDetector::findSubpixelLocations(const GaussianScaleSpacePy
     laplacianSqrThreshold = sqr(mLaplacianThreshold);
     hessianThreshold = (sqr(mEdgeThreshold+1)/mEdgeThreshold);
     
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG start subpixel feature pointers intermediate].\n");
+        ARLOGi("mMaxSubpixelDistanceSqr %f.\n", mMaxSubpixelDistanceSqr);
+
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.subpixels) kimDebugData.subpixels = [];
+            kimDebugData.subpixels.push([]);
+        }, );
+    }
+        
     for(size_t i = 0; i < mFeaturePoints.size(); i++) {
         FeaturePoint& kp = mFeaturePoints[i];
         
@@ -558,16 +649,42 @@ void DoGScaleInvariantDetector::findSubpixelLocations(const GaussianScaleSpacePy
         const Image& lap0 = mLaplacianPyramid.images()[lap_index-1];
         const Image& lap1 = mLaplacianPyramid.images()[lap_index];
         const Image& lap2 = mLaplacianPyramid.images()[lap_index+1];
+
+        EM_ASM_({
+            var a = arguments;
+            kimDebugData.subpixels[kimDebugData.subpixels.length-1].push({
+                x: a[0],
+                y: a[1],
+            });
+        }, x, y);
         
         // Compute the Hessian
         if(!ComputeSubpixelHessian(A, b, lap0, lap1, lap2, x, y)) {
             continue;
         }
-        
+
+        EM_ASM_({
+            var a = arguments;
+            var pixels = kimDebugData.subpixels[kimDebugData.subpixels.length-1];
+            var pt = pixels[pixels.length-1];
+            pt.A = [];
+            pt.b = [];
+            for (let i = 0; i <= 8; i++) pt.A.push(a[i]);
+            for (let i = 9; i <= 11; i++) pt.b.push(a[i]);
+        }, A[0], A[1], A[2], A[3], A[4], A[5], A[6], A[7], A[8], b[0], b[1], b[2]);
+
         // A*u=b
         if(!SolveSymmetricLinearSystem3x3(u, A, b)) {
             continue;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            var pixels = kimDebugData.subpixels[kimDebugData.subpixels.length-1];
+            var pt = pixels[pixels.length-1];
+            pt.u = [];
+            for (let i = 0; i <= 2; i++) pt.u.push(a[i]);
+        }, u[0], u[1], u[2]);
         
         // If points move too much in the sub-pixel update, then the point probably
         // unstable.
@@ -602,6 +719,10 @@ void DoGScaleInvariantDetector::findSubpixelLocations(const GaussianScaleSpacePy
             kp.sigma = pyramid->effectiveSigma(kp.octave, kp.sp_scale);
             mFeaturePoints[num_points++] = kp;
         }
+    }
+
+    if (KIM_DEBUG) {
+        ARLOGi("[KIM DEBUG end subpixel feature pointers intermediate].\n");
     }
     
     mFeaturePoints.resize(num_points);

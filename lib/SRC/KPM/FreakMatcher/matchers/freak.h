@@ -42,6 +42,8 @@
 #include <utils/point.h>
 #include <detectors/interpolate.h>
 #include "feature_store.h"
+#include <emscripten/emscripten.h>
+#include "AR/ar.h"
 
 namespace vision {
     
@@ -233,6 +235,22 @@ namespace vision {
         
         // Transformation from canonical test locations to image
         Similarity(S, point.x, point.y, point.angle, transform_scale);
+
+        // KIM DEBUG similarity
+        EM_ASM_({
+            var a = arguments;
+            if (!kimDebugData.freak) kimDebugData.freak = [];
+            kimDebugData.freak.push({
+                S: [],
+                samples: [],
+            });
+        }, );
+        for (int i = 0; i < 9; i++) {
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.freak[kimDebugData.freak.length-1].S.push(a[0]);
+            }, S[i]);
+        }
         
         // Locate center points
         c[0] = S[2];
@@ -306,6 +324,21 @@ namespace vision {
         samples[3] = SampleReceptor(pyramid, r5[6],  r5[7], octave, scale);
         samples[4] = SampleReceptor(pyramid, r5[8],  r5[9], octave, scale);
         samples[5] = SampleReceptor(pyramid, r5[10], r5[11], octave, scale);
+
+        // KIM DEBUG similarity
+        for (int i = 0; i < 6; i++) {
+            EM_ASM_({
+                var a = arguments;
+                kimDebugData.freak[kimDebugData.freak.length-1].samples.push({
+                  value: a[0], 
+                  octave: a[1],
+                  scale: a[2],
+                  x: a[3],
+                  y: a[4],
+                  sigma: a[5]
+                });
+            }, samples[i], octave, scale, r5[i], r5[i+1], s5);
+        }
         
         //
         // Locate and sample ring 4
