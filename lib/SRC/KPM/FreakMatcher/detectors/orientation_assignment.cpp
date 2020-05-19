@@ -164,13 +164,15 @@ void OrientationAssignment::compute(float* angles,
     
     // Build up the orientation histogram
     for(int yp = y0; yp <= y1; yp++) {
-        float dy = yp-y;
+        //float dy = yp-y;
+        float dy = yp-yi; //KIM FIX 
         float dy2 = sqr(dy);
         
         const float* y_ptr = g.get<float>(yp);
         
         for(int xp = x0; xp <= x1; xp++) {
-            float dx = xp-x;
+            //float dx = xp-x;
+            float dx = xp-xi; //KIM FIX 
             float r2 = sqr(dx)+dy2;
             
             // Only use the gradients within the circular window
