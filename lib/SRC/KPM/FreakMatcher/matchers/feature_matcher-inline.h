@@ -133,11 +133,27 @@ namespace vision {
             // Perform an indexed nearest neighbor lookup
             const unsigned char* f1 = features1->feature(i);
             index2.query(f1);
-            
+
             const FeaturePoint& p1 = features1->point(i);
             
             // Search for 1st and 2nd best match
             const std::vector<int>& v = index2.reverseIndex();
+
+            EM_ASM_({
+                var a = arguments;
+                if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+                if (!artoolkit.kimDebugMatching.matches) artoolkit.kimDebugMatching.matches = [];
+                artoolkit.kimDebugMatching.matches.push({
+                  reverseIndexes: []
+                });
+            });
+            for (int j = 0; j < v.size(); j++) {
+              EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.matches[artoolkit.kimDebugMatching.matches.length-1].reverseIndexes.push(a[0]);
+              }, v[j]);
+            }
+
             for(size_t j = 0; j < v.size(); j++) {
                 // Both points should be a MINIMA or MAXIMA
                 if(p1.maxima != features2->point(v[j]).maxima) {
@@ -171,6 +187,14 @@ namespace vision {
                     }
                 }
             }
+
+            EM_ASM_({
+                var a = arguments;
+                var match = artoolkit.kimDebugMatching.matches[artoolkit.kimDebugMatching.matches.length-1];
+                match.bestIndex = a[0];
+                match.firstBest = a[1];
+                match.secondBest = a[2];
+            }, best_index, first_best, second_best);
         }
         ASSERT(mMatches.size() <= features1->size(), "Number of matches should be lower");
         return mMatches.size();

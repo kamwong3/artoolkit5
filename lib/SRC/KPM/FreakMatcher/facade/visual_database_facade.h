@@ -41,6 +41,10 @@
 #include <utils/point.h>
 #include <matchers/matcher_types.h>
 
+#include <AR/ar.h>
+#include <KPM/kpm.h>
+#include <KPM/kpmType.h>
+
 namespace vision {
 
     class VisualDatabaseImpl;

@@ -41,6 +41,9 @@
 
 #include <vector>
 #include <unordered_map>
+#include <map>
+
+#include <emscripten.h>
 
 namespace vision {
 
@@ -51,7 +54,8 @@ namespace vision {
     {
     public:
         
-        typedef std::unordered_map<unsigned int, unsigned int> hash_t;
+        //typedef std::unordered_map<unsigned int, unsigned int> hash_t;
+        typedef std::map<unsigned int, unsigned int> hash_t;
         typedef std::pair<int /*size*/, int /*index*/> vote_t;
         typedef std::vector<vote_t> vote_vector_t;
         
@@ -343,7 +347,7 @@ namespace vision {
         int binYPlus1;
         int binAnglePlus1;
         int binScalePlus1;
-        
+
         // Check that the vote is within range
         if(x        <  mMinX        ||
            x        >= mMaxX        ||
@@ -374,6 +378,26 @@ namespace vision {
         binScale    = std::floor(mfBinScale-0.5f);
         
         binAngle    = (binAngle+mNumAngleBins)%mNumAngleBins;
+
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].bins.push({
+              fbinX: a[0],
+              fbinY: a[1],
+              fbinAngle: a[2],
+              fbinScale: a[3],
+              binX: a[4],
+              binY: a[5],
+              binAngle: a[6],
+              binScale: a[7],
+              x: a[8],
+              y: a[9],
+              angle: a[10],
+              scale: a[11],
+              minY: a[12],
+              maxY: a[13]
+            });
+        }, mfBinX, mfBinY, mfBinAngle, mfBinScale, binX, binY, binAngle, binScale, x, y, angle, scale, mMinY, mMaxY);
         
         // Check that we can voting to all 16 bin locations 
         if(binX         <  0              ||
@@ -389,6 +413,20 @@ namespace vision {
         binYPlus1     = binY+1;
         binScalePlus1 = binScale+1;
         binAnglePlus1 = (binAngle+1)%mNumAngleBins;
+
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].votes.push({
+              binX: a[0],
+              binY: a[1],
+              binAngle: a[2],
+              binScale: a[3],
+              x: a[4],
+              y: a[5],
+              angle: a[6],
+              scale: a[7],
+            });
+        }, binX, binY, binAngle, binScale, x, y, angle, scale);
         
         //
         // Cast the 16 votes

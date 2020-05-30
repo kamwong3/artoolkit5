@@ -186,17 +186,51 @@ namespace vision {
         // Loop over all the images in the database
         typename keyframe_map_t::const_iterator it = mKeyframeMap.begin();
         for(; it != mKeyframeMap.end(); it++) {
+
+            EM_ASM_({
+                var a = arguments;
+                if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+                if (!artoolkit.kimDebugMatching.querykeyframes) artoolkit.kimDebugMatching.querykeyframes = [];
+                artoolkit.kimDebugMatching.querykeyframes.push({
+                  matches1: [],
+                  matches2: [],
+                  houghMatches1: [],
+                  houghMatches2: [],
+                  inlierMatches1: [],
+                  inlierMatches2: [],
+                  houghConfigs: [],
+                  houghComputeConfigs: [],
+                  houghVoteds: [],
+                  mapCorrespondences: [],
+                  smallestTriangleArea: [],
+                  HInv: [],
+                  bins: [],
+                  votes: [],
+                  inliersD: []
+                });
+            });
+
             TIMED("Find Matches (1)") {
                 if(mUseFeatureIndex) {
                     if(mMatcher.match(&query_keyframe->store(), &it->second->store(), it->second->index()) < mMinNumInliers) {
-                        continue;
+                        //continue;
                     }
                 } else {
                     if(mMatcher.match(&query_keyframe->store(), &it->second->store()) < mMinNumInliers) {
-                        continue;
+                        //continue;
                     }
                 }
             }
+
+            for (int i = 0; i < mMatcher.matches().size(); i++) {
+              EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].matches1.push({ins: a[0], res: a[1]});
+              }, mMatcher.matches()[i].ins, mMatcher.matches()[i].ref);
+            }
+
+            if (mMatcher.matches().size() < mMinNumInliers) continue;
+            
             
             const std::vector<FeaturePoint>& ref_points = it->second->store().points();
             //std::cout<<"ref_points-"<<ref_points.size()<<std::endl;
@@ -229,7 +263,13 @@ namespace vision {
                                  max_hough_index,
                                  kHoughBinDelta);
             }
-            
+            for (int i = 0; i < hough_matches.size(); i++) {
+              EM_ASM_({
+                  var a = arguments;
+                 artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].
+  houghMatches1.push({ins: a[0], res: a[1]});
+              }, hough_matches[i].ins, hough_matches[i].ref);
+            }
             //
             // Estimate the transformation between the two images
             //
@@ -246,17 +286,27 @@ namespace vision {
                     continue;
                 }
             }
-            
-            //
-            // Find the inliers
-            //
+
+            EM_ASM_({
+                var a = arguments;
+                artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].H1 = ([a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]]);
+            }, H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8]);
             
             matches_t inliers;
+
             TIMED("Find Inliers (1)") {
                 FindInliers(inliers, H, query_points, ref_points, hough_matches, mHomographyInlierThreshold);
                 if(inliers.size() < mMinNumInliers) {
                     continue;
                 }
+            }
+
+            for (int i = 0; i < inliers.size(); i++) {
+              EM_ASM_({
+                 var a = arguments;
+                 artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].
+  inlierMatches1.push({ins: a[0], res: a[1]});
+              }, inliers[i].ins, inliers[i].ref);
             }
             
             //
@@ -268,9 +318,18 @@ namespace vision {
                                   &it->second->store(),
                                   H,
                                   10) < mMinNumInliers) {
-                    continue;
+                   // continue;
                 }
             }
+            
+            for (int i = 0; i < mMatcher.matches().size(); i++) {
+              EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].matches2.push({ins: a[0], res: a[1]});
+              }, mMatcher.matches()[i].ins, mMatcher.matches()[i].ref);
+            }
+
+            if (mMatcher.matches().size() < mMinNumInliers) continue;
             
             //
             // Vote for a similarity with new matches
@@ -313,6 +372,11 @@ namespace vision {
                     continue;
                 }
             }
+
+            EM_ASM_({
+                var a = arguments;
+                artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].H2 = ([a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]]);
+            }, H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8]);
             
             //
             // Check if this is the best match based on number of inliers
@@ -321,6 +385,14 @@ namespace vision {
             inliers.clear();
             TIMED("Find Inliers (2)") {
                 FindInliers(inliers, H, query_points, ref_points, hough_matches, mHomographyInlierThreshold);
+            }
+
+            for (int i = 0; i < inliers.size(); i++) {
+              EM_ASM_({
+                 var a = arguments;
+                 artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].
+  inlierMatches2.push({ins: a[0], res: a[1]});
+              }, inliers[i].ins, inliers[i].ref);
             }
             
             //std::cout<<"inliers-"<<inliers.size()<<std::endl;
@@ -331,6 +403,27 @@ namespace vision {
             }
         }
         
+
+        EM_ASM_({
+           var a = arguments;
+           artoolkit.kimDebugMatching.finalMatchId = a[0];
+           artoolkit.kimDebugMatching.finalMatches = ([]);
+           artoolkit.kimDebugMatching.finalH = ([]);
+        }, mMatchedId);
+        for (int i = 0; i < mMatchedInliers.size(); i++) {
+          EM_ASM_({
+             var a = arguments;
+             artoolkit.kimDebugMatching.finalMatches.push({ins: a[0], res: a[1]});
+          }, mMatchedInliers[i].ins, mMatchedInliers[i].ref);
+        }
+        if (mMatchedId >= 0) {
+          for (int i = 0; i < 9; i++) {
+            EM_ASM_({
+               var a = arguments;
+               artoolkit.kimDebugMatching.finalH.push(a[0]);
+            }, mMatchedGeometry[i]);
+          }
+        }
         return mMatchedId >= 0;
     }
     

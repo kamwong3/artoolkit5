@@ -94,7 +94,8 @@ namespace vision {
      * Robustly solve for the homography given a set of correspondences. 
      */
     template<typename T>
-    bool PreemptiveRobustHomography(T H[9],
+    //bool PreemptiveRobustHomography(T H[9],
+    bool PreemptiveRobustHomography(float H[9],
                                     const T* p,
                                     const T* q,
                                     int num_points,
@@ -173,9 +174,16 @@ namespace vision {
             
             // Check the test points
             if(num_test_points > 0) {
-                if(!HomographyPointsGeometricallyConsistent(&hyp[num_hypotheses*9], test_points, num_test_points)) {
-                    continue;
-                }
+              EM_ASM_({
+                  var a = arguments;
+                  var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+                  var homography = keyframe.homography[keyframe.homography.length-1];
+                  homography.consistent = a[0];
+              }, HomographyPointsGeometricallyConsistent(&hyp[num_hypotheses*9], test_points, num_test_points));
+
+              if(!HomographyPointsGeometricallyConsistent(&hyp[num_hypotheses*9], test_points, num_test_points)) {
+                  continue;
+              }
             }
             
             num_hypotheses++;
@@ -232,8 +240,25 @@ namespace vision {
         }
         
         // Move the best hypothesis
-        CopyVector9(H, &hyp[min_index*9]);
+        //CopyVector9(H, &hyp[min_index*9]);
+        H[0] = (float) hyp[min_index*9];
+        H[1] = (float) hyp[min_index*9+1];
+        H[2] = (float) hyp[min_index*9+2];
+        H[3] = (float) hyp[min_index*9+3];
+        H[4] = (float) hyp[min_index*9+4];
+        H[5] = (float) hyp[min_index*9+5];
+        H[6] = (float) hyp[min_index*9+6];
+        H[7] = (float) hyp[min_index*9+7];
+        H[8] = (float) hyp[min_index*9+8];
+
         NormalizeHomography(H);
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.consistent = a[0];
+        }, HomographyPointsGeometricallyConsistent(&hyp[num_hypotheses*9], test_points, num_test_points));
         
         return true;
     }

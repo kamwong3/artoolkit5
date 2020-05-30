@@ -49,8 +49,11 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <map>
 
 #include "feature_point.h"
+
+#include <emscripten.h>
 
 #ifdef USE_OPENCV
 #  include <opencv2/calib3d/calib3d.hpp>
@@ -69,7 +72,8 @@ namespace vision {
         
         typedef Keyframe<96> keyframe_t;
         typedef std::shared_ptr<keyframe_t> keyframe_ptr_t;
-        typedef std::unordered_map<id_t, keyframe_ptr_t> keyframe_map_t;
+        //typedef std::unordered_map<id_t, keyframe_ptr_t> keyframe_map_t;
+        typedef std::map<id_t, keyframe_ptr_t> keyframe_map_t; // kim: use ordered map for deterministic result
         
         typedef BinomialPyramid32f pyramid_t;
         typedef DoGScaleInvariantDetector detector_t;
@@ -197,7 +201,8 @@ namespace vision {
         HoughSimilarityVoting mHoughSimilarityVoting;
         
         // Robust homography estimation
-        RobustHomography<float> mRobustHomography;
+        //RobustHomography<float> mRobustHomography;
+        RobustHomography<double> mRobustHomography;
         
     }; // VisualDatabase
     
@@ -251,6 +256,11 @@ namespace vision {
         if(!MatrixInverse3x3<float>(Hinv, H, 1e-5)) {
             return false;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].HInv.push([a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]]);
+        }, Hinv[0], Hinv[1], Hinv[2], Hinv[3], Hinv[4], Hinv[5], Hinv[6], Hinv[7], Hinv[8]);
         
         const float p0[] = {0, 0};
         const float p1[] = {(float)refWidth, 0};
@@ -261,6 +271,11 @@ namespace vision {
         MultiplyPointHomographyInhomogenous(p1p, Hinv, p1);
         MultiplyPointHomographyInhomogenous(p2p, Hinv, p2);
         MultiplyPointHomographyInhomogenous(p3p, Hinv, p3);
+
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].smallestTriangleArea.push(a[0]);
+        }, SmallestTriangleArea(p0p, p1p, p2p, p3p));
         
         const float tr = refWidth*refHeight*0.0001;
         if(SmallestTriangleArea(p0p, p1p, p2p, p3p) < tr) {
@@ -333,6 +348,17 @@ namespace vision {
         float dx, dy, dangle, dscale;
         int bin_x, bin_y, bin_angle, bin_scale;
         hough.getBinsFromIndex(bin_x, bin_y, bin_angle, bin_scale, binIndex);
+
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].houghVoteds.push({
+              binX: a[0],
+              binY: a[1],
+              binAngle: a[2],
+              binScale: a[3],
+              binIndex: a[4]
+            });
+        }, bin_x, bin_y, bin_angle, bin_scale, binIndex);
         
         out_matches.clear();
         
@@ -360,12 +386,15 @@ namespace vision {
                                    const std::vector<FeaturePoint>& p1,
                                    const std::vector<FeaturePoint>& p2,
                                    const matches_t& matches,
-                                   RobustHomography<float>& estimator,
+                                   //RobustHomography<float>& estimator,
+                                   RobustHomography<double>& estimator,
                                    int refWidth,
                                    int refHeight) {
         
-        std::vector<vision::Point2d<float> > srcPoints(matches.size());
-        std::vector<vision::Point2d<float> > dstPoints(matches.size());
+        //std::vector<vision::Point2d<float> > srcPoints(matches.size());
+        //std::vector<vision::Point2d<float> > dstPoints(matches.size());
+        std::vector<vision::Point2d<double> > srcPoints(matches.size());
+        std::vector<vision::Point2d<double> > dstPoints(matches.size());
         
         //
         // Copy correspondences
@@ -382,7 +411,8 @@ namespace vision {
         // Create test points for geometric verification
         //
         
-        float test_points[8];
+        //float test_points[8];
+        double test_points[8];
         test_points[0] = 0;
         test_points[1] = 0;
         test_points[2] = refWidth;
@@ -396,7 +426,8 @@ namespace vision {
         // Compute the homography
         //
         
-        if(!estimator.find(H, (float*)&srcPoints[0], (float*)&dstPoints[0], (int)matches.size(), test_points, 4)) {
+        //if(!estimator.find(H, (float*)&srcPoints[0], (float*)&dstPoints[0], (int)matches.size(), test_points, 4)) {
+        if(!estimator.find(H, (double*)&srcPoints[0], (double*)&dstPoints[0], (int)matches.size(), test_points, 4)) {
             return false;
         }
         
@@ -430,6 +461,12 @@ namespace vision {
                                                 p2[matches[i].ref].x,
                                                 p2[matches[i].ref].y);
             float d2 = sqr(xp[0]-p1[matches[i].ins].x) + sqr(xp[1]-p1[matches[i].ins].y);
+
+            EM_ASM_({
+                var a = arguments;
+                artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].inliersD.push(a[0]);
+            }, d2);
+
             if(d2 <= threshold2) {
                 inliers.push_back(matches[i]);
             }

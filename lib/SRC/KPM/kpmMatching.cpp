@@ -52,6 +52,8 @@ extern "C" {
 #  include "AnnMatch2.h"
 #endif
 
+#include <emscripten.h>
+
 int kpmUtilGetPose_binary( ARParamLT *cparamLT, const vision::matches_t &matchData, const std::vector<vision::Point3d<float> > &refDataSet, const std::vector<vision::FeaturePoint> &inputDataSet, float  camPose[3][4], float  *error );
 
 template<typename T>
@@ -420,9 +422,35 @@ int kpmMatching(KpmHandle *kpmHandle, ARUint8 *inImageLuma)
         imageLumaWasAllocated = 1;
     }
 
+    EM_ASM_({
+        var a = arguments;
+        if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+        artoolkit.kimDebugMatching.inputImage = ({
+          width: a[0],
+          height: a[1],
+          values: []
+        });
+        artoolkit.kimDebugMatching.points = [];
+    }, xsize, ysize);
+    for (int j = 0; j < ysize; j++) {
+      for (int i = 0; i < xsize; i++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.inputImage.values.push(a[0]);
+        }, imageLuma[j*xsize+i]);
+      }
+    }
+
 #if BINARY_FEATURE
     kpmHandle->freakMatcher->query(imageLuma, xsize ,ysize);
     kpmHandle->inDataSet.num = (int)kpmHandle->freakMatcher->getQueryFeaturePoints().size();
+
+    EM_ASM_({
+      var a = arguments;
+      artoolkit.kimDebugMatching.inDataSet = {
+        num: a[0]
+      };
+    }, kpmHandle->inDataSet.num);
 #else
     surfSubExtractFeaturePoint( kpmHandle->surfHandle, inImageBW, kpmHandle->skipRegion.region, kpmHandle->skipRegion.regionNum );
     kpmHandle->skipRegion.regionNum = 0;
@@ -456,9 +484,20 @@ int kpmMatching(KpmHandle *kpmHandle, ARUint8 *inImageLuma)
 #endif
         if( procMode == KpmProcFullSize ) {
             for( i = 0 ; i < kpmHandle->inDataSet.num; i++ ) {
-
 #if BINARY_FEATURE
                 float  x = points[i].x, y = points[i].y;
+
+                EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.points.push({
+                    x: a[0],
+                    y: a[1],
+                    scale: a[2],
+                    angle: a[3],
+                    maxima: a[4],
+                    desc: []
+                  });
+                }, x, y, points[i].scale, points[i].angle, points[i].maxima);
 #else
                 float  x, y, *desc;
                 surfSubGetFeaturePosition( kpmHandle->surfHandle, i, &x, &y );
@@ -468,7 +507,8 @@ int kpmMatching(KpmHandle *kpmHandle, ARUint8 *inImageLuma)
                 }
                 featureVector.sf[i].l = surfSubGetFeatureSign( kpmHandle->surfHandle, i );
 #endif
-                if( kpmHandle->cparamLT != NULL ) {
+                //if( kpmHandle->cparamLT != NULL ) {
+                if(false) { // KIM disable camera correction
                     arParamObserv2IdealLTf( &(kpmHandle->cparamLT->paramLTf), x, y, &(kpmHandle->inDataSet.coord[i].x), &(kpmHandle->inDataSet.coord[i].y) );
                 }
                 else {

@@ -39,6 +39,8 @@
 #include <math/linear_solvers.h>
 #include <math/math_utils.h>
 
+#include <emscripten.h>
+
 namespace vision {
     
     /**
@@ -194,9 +196,35 @@ namespace vision {
                                                    const T xp4[2]) {
         T A[72];
         Homography4PointsInhomogeneousConstraint(A, x1, x2, x3, x4, xp1, xp2, xp3, xp4);
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.A = [];
+        });
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.A.push(a[0]);
+          }, A[i]);
+        }
+        
+        //
         if(!SolveNullVector8x9Destructive(H, A)) {
             return false;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.detH = a[0];
+            homography.detHAbs = a[1];
+        }, Determinant3x3(H), std::abs(Determinant3x3(H)));
+
         if(std::abs(Determinant3x3(H)) < 1e-5) {
             return false;
         }
@@ -223,6 +251,22 @@ namespace vision {
 		
 		T x1p[2], x2p[2], x3p[2], x4p[2];
 		T xp1p[2], xp2p[2], xp3p[2], xp4p[2];
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            if (!keyframe.homography) keyframe.homography = [];
+            keyframe.homography.push({
+              x1: [a[0], a[1]],
+              x2: [a[2], a[3]],
+              x3: [a[4], a[5]],
+              x4: [a[6], a[7]],
+              xp1: [a[8], a[9]],
+              xp2: [a[10], a[11]],
+              xp3: [a[12], a[13]],
+              xp4: [a[14], a[15]],
+            });
+        }, x1[0], x1[1], x2[0], x2[1], x3[0], x3[1], x4[0], x4[1], xp1[0], xp1[1], xp2[0], xp2[1], xp3[0], xp3[1], xp4[0], xp4[1]);
 		
         //
 		// Condition the points
@@ -240,6 +284,19 @@ namespace vision {
                                x4)) {
             return false;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.x1p = ([a[0], a[1]]);
+            homography.x2p = ([a[2], a[3]]);
+            homography.x3p = ([a[4], a[5]]);
+            homography.x4p = ([a[6], a[7]]);
+            homography.t = ([a[8], a[9]]);
+            homography.s = a[10];
+        }, x1p[0], x1p[1], x2p[0], x2p[1], x3p[0], x3p[1], x4p[0], x4p[1], t[0], t[1], s);
+
 		if(!Condition4Points2d(xp1p,
                                xp2p,
                                xp3p,
@@ -252,6 +309,18 @@ namespace vision {
                                xp4)) {
             return false;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.xp1p = ([a[0], a[1]]);
+            homography.xp2p = ([a[2], a[3]]);
+            homography.xp3p = ([a[4], a[5]]);
+            homography.xp4p = ([a[6], a[7]]);
+            homography.tp = ([a[8], a[9]]);
+            homography.sp = a[10];
+        }, xp1p[0], xp1p[1], xp2p[0], xp2p[1], xp3p[0], xp3p[1], xp4p[0], xp4p[1], tp[0], tp[1], sp);
         
         //
         // Solve for the homography
@@ -268,12 +337,26 @@ namespace vision {
                                                xp4p)) {
             return false;
         }
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.Hn = ([a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]]);
+        }, Hn[0], Hn[1], Hn[2], Hn[3], Hn[4], Hn[5], Hn[6], Hn[7], Hn[8]);
         
         //
         // Denomalize the computed homography
         //
         
 		DenormalizeHomography(H, Hn, s, t, sp, tp);
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.H = ([a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]]);
+        }, H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8]);
         
         return true;
     }

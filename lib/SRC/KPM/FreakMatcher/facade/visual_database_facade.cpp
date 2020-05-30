@@ -40,6 +40,11 @@
 #include <framework/image.h>
 #include <matchers/visual_database-inline.h>
 
+#include <AR/ar.h>
+#include <KPM/kpm.h>
+#include <KPM/kpmType.h>
+#include <emscripten.h>
+
 namespace vision {
     typedef VisualDatabase<FREAKExtractor, BinaryFeatureStore, BinaryFeatureMatcher<96> > vdb_t;
     typedef std::vector<vision::Point3d<float> > Point3dVector;
@@ -87,6 +92,44 @@ namespace vision {
         keyframe->store().points() = featurePoints;
         keyframe->store().features().resize(descriptors.size());
         keyframe->store().features() = descriptors;
+
+        EM_ASM_({
+            var a = arguments;
+            if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+            if (!artoolkit.kimDebugMatching.refsets) artoolkit.kimDebugMatching.refsets = [];
+            artoolkit.kimDebugMatching.refsets.push({
+              width: a[0],
+              height: a[1],
+              imageId: a[2],
+              points: [],
+              descriptors: []
+            });
+        }, width, height, image_id);
+
+        ARLOGi("feature points size: %d, descriptors size; %d\n", featurePoints.size(), descriptors.size());
+        for (int i = 0; i < featurePoints.size(); i++) {
+          EM_ASM_({
+              var a = arguments;
+              var refset = artoolkit.kimDebugMatching.refsets[artoolkit.kimDebugMatching.refsets.length - 1];
+              refset.points.push({
+                x2d: a[0],
+                y2d: a[1],
+                angle: a[2],
+                scale: a[3],
+                maxima: a[4],
+                descriptors: [],
+              })
+          }, featurePoints[i].x, featurePoints[i].y, featurePoints[i].angle, featurePoints[i].scale, featurePoints[i].maxima);
+
+          for(int j = 0; j < FREAK_SUB_DIMENSION; j++ ) {
+            EM_ASM_({
+                var a = arguments;
+                var refset = artoolkit.kimDebugMatching.refsets[artoolkit.kimDebugMatching.refsets.length - 1];
+                refset.points[a[0]].descriptors.push(a[1]);
+            }, i, ((unsigned char*)descriptors[i * FREAK_SUB_DIMENSION + j])); 
+          }
+        }
+
         keyframe->buildIndex();
         mVisualDbImpl->mVdb->addKeyframe(keyframe, image_id);
         mVisualDbImpl->mPoint3d[image_id] = points3D;

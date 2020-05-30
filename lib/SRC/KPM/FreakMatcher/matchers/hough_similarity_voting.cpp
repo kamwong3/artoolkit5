@@ -36,6 +36,8 @@
 #include "hough_similarity_voting.h"
 #include <utils/partial_sort.h>
 
+#include <emscripten.h>
+
 using namespace vision;
 
 HoughSimilarityVoting::HoughSimilarityVoting()
@@ -115,6 +117,16 @@ void HoughSimilarityVoting::vote(const float* ins, const float* ref, int size) {
     if(mAutoAdjustXYNumBins) {
         autoAdjustXYNumBins(ins, ref, size);
     }
+
+    EM_ASM_({
+        var a = arguments;
+        artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].houghConfigs.push({
+          mNumXBins: a[0],
+          mNumYBins: a[1],
+          mNumAngleBins: a[2],
+          mNumScaleBins: a[3],
+        });
+    }, mNumXBins, mNumYBins, mNumAngleBins, mNumScaleBins);
     
     num_features_that_cast_vote = 0;
     for(int i = 0; i < size; i++) {
@@ -134,6 +146,15 @@ void HoughSimilarityVoting::vote(const float* ins, const float* ref, int size) {
                           ref_ptr[1],
                           ref_ptr[2],
                           ref_ptr[3]);
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].mapCorrespondences.push({
+              x: a[0],
+              y: a[1],
+              angle: a[2],
+              scale: a[3],
+            });
+        }, x, y, angle, scale);
         
         // Cast a vote
         if(vote(x, y, angle, scale)) {
@@ -208,6 +229,13 @@ void HoughSimilarityVoting::autoAdjustXYNumBins(const float* ins, const float* r
     ASSERT(size > 0, "size must be positive");
     ASSERT(mRefImageWidth > 0, "width must be positive");
     ASSERT(mRefImageHeight > 0, "height must be positive");
+
+    EM_ASM_({
+      var a = arguments;
+      artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].houghComputeConfigs.push({
+        dims: []
+      });
+    });
     
     for(int i = 0; i < size; i++) {
         const float* ins_ptr = &ins[i<<2];
@@ -220,6 +248,12 @@ void HoughSimilarityVoting::autoAdjustXYNumBins(const float* ins, const float* r
         // Project the max_dim via the scale
         float scale = SafeDivision(ins_scale, ref_scale);
         projected_dim[i] = scale*max_dim;
+
+        EM_ASM_({
+          var a = arguments;
+          var cs = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].houghComputeConfigs;
+          cs[cs.length-1].dims.push(a[0]);
+        }, projected_dim[i]);
     }
     
     // Find the median projected dim
@@ -233,4 +267,11 @@ void HoughSimilarityVoting::autoAdjustXYNumBins(const float* ins, const float* r
     
     mA = mNumXBins*mNumYBins;
     mB = mNumXBins*mNumYBins*mNumAngleBins;
+
+    EM_ASM_({
+        var a = arguments;
+        var cs = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1].houghComputeConfigs;
+        cs[cs.length-1].medianProjDim = a[0];
+        cs[cs.length-1].binSize = a[1];
+    }, median_proj_dim, bin_size);
 }

@@ -39,6 +39,10 @@
 
 #include <unordered_map>
 #include <queue>
+#include <map>
+
+#include <AR/ar.h>
+#include <emscripten.h>
 
 namespace vision {
     
@@ -214,7 +218,8 @@ namespace vision {
         typedef Node<NUM_BYTES_PER_FEATURE> node_t;
         typedef std::unique_ptr<node_t> node_ptr_t;
         typedef BinarykMedoids<NUM_BYTES_PER_FEATURE> kmedoids_t;
-        typedef std::unordered_map<int, std::vector<int> > cluster_map_t;
+        //typedef std::unordered_map<int, std::vector<int> > cluster_map_t;
+        typedef std::map<int, std::vector<int> > cluster_map_t;  // kim: change to ordered map for deterministic result
         
         typedef PriorityQueueItem<NUM_BYTES_PER_FEATURE> queue_item_t;
         typedef std::priority_queue<queue_item_t> queue_t;
@@ -296,6 +301,8 @@ namespace vision {
         inline int nextNodeId() {
             return mNextNodeId++;
         }
+
+        void debugNode(const node_t* node);
         
         /**
          * Private build function with a set of indices.
@@ -333,6 +340,39 @@ namespace vision {
             indices[i] = (int)i;
         }
         build(features, num_features, &indices[0], (int)indices.size());
+
+        EM_ASM_({
+            var a = arguments;
+            if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+            if (!artoolkit.kimDebugMatching.clusters) artoolkit.kimDebugMatching.clusters = [];
+            artoolkit.kimDebugMatching.clusters.push([]);
+        });
+        debugNode(mRoot.get());
+    }
+
+    template<int NUM_BYTES_PER_FEATURE>
+    void BinaryHierarchicalClustering<NUM_BYTES_PER_FEATURE>::debugNode(const node_t* node) {
+        EM_ASM_({
+            var a = arguments;
+            var cluster = artoolkit.kimDebugMatching.clusters[artoolkit.kimDebugMatching.clusters.length-1];
+            cluster.push({
+              leaf: a[0],
+              reverseIndexes: [],
+              mCenterDesc: []
+            });
+        }, node->leaf());
+
+        for (int i = 0; i < node->reverseIndex().size(); i++) {
+          EM_ASM_({
+              var a = arguments;
+              var cluster = artoolkit.kimDebugMatching.clusters[artoolkit.kimDebugMatching.clusters.length-1];
+              cluster[cluster.length-1].reverseIndexes.push(a[0]);
+          }, node->reverseIndex()[i]);
+        }
+
+        for (int i = 0; i < node->children().size(); i++) {
+          debugNode(node->children()[i]);
+        }
     }
     
     template<int NUM_BYTES_PER_FEATURE>
@@ -354,6 +394,19 @@ namespace vision {
             }
         } else {
             cluster_map_t cluster_map;
+
+            EM_ASM_({
+                var a = arguments;
+                if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+                if (!artoolkit.kimDebugMatching.assignmentIndexes) artoolkit.kimDebugMatching.assignmentIndexes = [];
+                artoolkit.kimDebugMatching.assignmentIndexes.push([]);
+            });
+            for (int i = 0; i < num_indices; i++) {
+              EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.assignmentIndexes[artoolkit.kimDebugMatching.assignmentIndexes.length-1].push(a[0]);
+              }, indices[i]);
+            }
             
             // Perform clustering
             mBinarykMedoids.assign(features, num_features, indices, num_indices);
@@ -361,11 +414,24 @@ namespace vision {
             // Get a list of features for each cluster center
             const std::vector<int>& assignment = mBinarykMedoids.assignment();
             ASSERT(assignment.size() == num_indices, "Assignment size wrong");
+
+            EM_ASM_({
+                var a = arguments;
+                if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
+                if (!artoolkit.kimDebugMatching.assignments) artoolkit.kimDebugMatching.assignments = [];
+                artoolkit.kimDebugMatching.assignments.push([]);
+            });
+            for (int i = 0; i < assignment.size(); i++) {
+              EM_ASM_({
+                  var a = arguments;
+                  artoolkit.kimDebugMatching.assignments[artoolkit.kimDebugMatching.assignments.length-1].push(a[0]);
+              }, assignment[i]);
+            }
+
             for(size_t i = 0; i < assignment.size(); i++) {
                 ASSERT(assignment[i] != -1, "Assignment is invalid");
                 ASSERT(assignment[i] < num_indices, "Assignment out of range");
                 ASSERT(indices[assignment[i]] < num_features, "Assignment out of range");
-                
                 cluster_map[indices[assignment[i]]].push_back(indices[i]);
             }
 

@@ -39,6 +39,10 @@
 #include <math/linear_algebra.h>
 #include <math/indexing.h>
 
+#include <emscripten.h>
+
+static const float EPSILON = 0.0000000000001;
+
 namespace vision {
     
     /**
@@ -78,7 +82,9 @@ namespace vision {
         ss[7] = SumSquares9(A+63);
         
         int index = MaxIndex8(ss);
-        if(ss[index] == 0) {
+
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -109,7 +115,8 @@ namespace vision {
         ss[6] = SumSquares9(Q+63);
         
         int index = MaxIndex7(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -138,7 +145,8 @@ namespace vision {
         ss[5] = SumSquares9(Q+63);
         
         int index = MaxIndex6(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -165,7 +173,8 @@ namespace vision {
         ss[4] = SumSquares9(Q+63);
         
         int index = MaxIndex5(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -190,7 +199,8 @@ namespace vision {
         ss[3] = SumSquares9(Q+63);
         
         int index = MaxIndex4(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -213,7 +223,8 @@ namespace vision {
         ss[2] = SumSquares9(Q+63);
         
         int index = MaxIndex3(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -234,7 +245,8 @@ namespace vision {
         ss[1] = SumSquares9(Q+63);
         
         int index = MaxIndex2(ss);
-        if(ss[index] == 0) {
+        //if(ss[index] == 0) {
+        if( std::fabs(ss[index]) < EPSILON) { //kim fix
             return false;
         }
         
@@ -250,7 +262,8 @@ namespace vision {
         AccumulateProjection9(Q+63, Q+54, A+63);
         
         T ss = SumSquares9(Q+63);
-        if(ss == 0) {
+        //if(ss == 0) {
+        if( std::fabs(ss) < EPSILON) { //kim fix
             return false;
         }
         
@@ -304,7 +317,8 @@ namespace vision {
         AccumulateScaledVector9(x, Q+63, -Q[63+i]);
         
         T ss = SumSquares9(x);
-        if(ss == 0) {
+        //if(ss == 0) {
+        if( std::fabs(ss) < EPSILON) { //kim fix
             return 0;
         }
         
@@ -328,6 +342,23 @@ namespace vision {
         w[6] = OrthogonalizeIdentity8x9(X+54, Q, 6);
         w[7] = OrthogonalizeIdentity8x9(X+63, Q, 7);
         w[8] = OrthogonalizeIdentity8x9(X+72, Q, 8);
+
+        for (int i = 0; i < 9; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.w.push(a[0]);
+          }, w[i]);
+        }
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.X.push(a[0]);
+          }, X[i]);
+        }
         
         int index = MaxIndex9(w);
         if(w[index] == 0) {
@@ -351,13 +382,107 @@ namespace vision {
         T Q[72];
         
         if(!OrthogonalizePivot8x9Basis0(Q, A)) return false;
+
+        EM_ASM_({
+            var a = arguments;
+            var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+            var homography = keyframe.homography[keyframe.homography.length-1];
+            homography.Q1 = [];
+            homography.Q2 = [];
+            homography.Q3 = [];
+            homography.Q4 = [];
+            homography.Q5 = [];
+            homography.Q6 = [];
+            homography.Q7 = [];
+            homography.Q8 = [];
+            homography.w = [];
+            homography.X = [];
+        });
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q1.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis1(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q2.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis2(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q3.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis3(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q4.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis4(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q5.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis5(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q6.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis6(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q7.push(a[0]);
+          }, Q[i]);
+        }
+
         if(!OrthogonalizePivot8x9Basis7(Q, A)) return false;
+
+        for (int i = 0; i < 72; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];
+              var homography = keyframe.homography[keyframe.homography.length-1];
+              homography.Q8.push(a[0]);
+          }, Q[i]);
+        }
         
         return OrthogonalizeIdentity8x9(x, Q);
     }
