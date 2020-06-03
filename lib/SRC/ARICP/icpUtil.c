@@ -41,6 +41,8 @@
 #include <AR/ar.h>
 #include <AR/icp.h>
 
+#include <emscripten.h>
+
 #ifdef ARDOUBLE_IS_FLOAT
 #  define SQRT sqrtf
 #  define _0_0 0.0f
@@ -172,6 +174,20 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
         return -1;
     }
 
+    // kim note:
+    //               [fx  s cx]
+    // matXc2U = K = [ 0 fx cy]
+    //               [ 0  0  1]  
+    //
+    //             [h0 h1 h2] 
+    // matC = H = [h3 h4 h5]
+    //             [h6 h7  1]
+    //
+    // [R|t] = K^-1 H
+    //
+    // v = R^T, t = t^T
+    //
+
     v[0][2] =  matC->m[6];
     v[0][1] = (matC->m[3] - matXc2U[1][2] * v[0][2]) / matXc2U[1][1];
     v[0][0] = (matC->m[0] - matXc2U[0][2] * v[0][2] - matXc2U[0][1] * v[0][1]) / matXc2U[0][0];
@@ -181,6 +197,42 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     t[2]  =  1.0;
     t[1]  = (matC->m[5] - matXc2U[1][2] * t[2]) / matXc2U[1][1];
     t[0]  = (matC->m[2] - matXc2U[0][2] * t[2] - matXc2U[0][1] * t[1]) / matXc2U[0][0];
+
+    EM_ASM_({
+      artoolkit.kimDebugMatching.matXc2U = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+      artoolkit.kimDebugMatching.initMatXw2Xc = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+      artoolkit.kimDebugMatching.v = ([[null,null,null], [null,null,null], [null,null,null]]);
+      artoolkit.kimDebugMatching.t = ([]);
+      artoolkit.kimDebugMatching.matC = ([]);
+    });
+    for (int i = 0; i < 9; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.matC[a[0]] = a[1];
+      }, i, matC->m[i]);
+    }
+    for (int i = 0; i < 3; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.t[a[0]] = a[1];
+      }, i, t[i]);
+    }
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 4; i++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.v[a[0]][a[1]] = a[2];
+        }, j, i, v[j][i]);
+      }
+    }
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 4; i++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.matXc2U[a[0]][a[1]] = a[2];
+        }, j, i, matXc2U[j][i]);
+      }
+    }
 
     arMatrixFree(matA);
     arMatrixFree(matB);
@@ -233,6 +285,15 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     initMatXw2Xc[0][3] = t[0];
     initMatXw2Xc[1][3] = t[1];
     initMatXw2Xc[2][3] = t[2];
+
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 4; i++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.initMatXw2Xc[a[0]][a[1]] = a[2];
+        }, j, i, initMatXw2Xc[j][i]);
+      }
+    }
 
 #if 0
 //ARLOGe("   %f %f %f --->", t[0], t[1], t[2]);

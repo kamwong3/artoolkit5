@@ -831,6 +831,21 @@ int kpmUtilGetPose_binary(ARParamLT *cparamLT, const vision::matches_t &matchDat
     }
     for (int r = 0; r < 3; r++) for (int c = 0; c < 4; c++) camPose[r][c] = (float)camPosed[r][c];
 #  endif
+
+
+    EM_ASM_({
+      artoolkit.kimDebugMatching.camPose = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+    });
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 4; i++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.camPose[a[0]][a[1]] = a[2];
+        }, j, i, camPose[j][i]);
+      }
+    }
+
+
 #endif
     icpDeleteHandle( &icpHandle );
     
