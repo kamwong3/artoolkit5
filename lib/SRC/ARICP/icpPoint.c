@@ -42,6 +42,8 @@
 #include <AR/matrix.h>
 #include <AR/icp.h>
 
+#include <emscripten.h>
+
 
 static void   icpGetXw2XcCleanup( char *message, ARdouble *J_U_S, ARdouble *dU );
 
@@ -51,6 +53,31 @@ int icpPoint( ICPHandleT   *handle,
               ARdouble        matXw2Xc[3][4],
               ARdouble       *err )
 {
+    ARLOGi("inside icpPoint");
+    EM_ASM_({
+      var a = arguments;
+      if (artoolkit.kimDebugMatching.logICP == true) {
+        artoolkit.kimDebugMatching.icp_initMatXw2Xc = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+        artoolkit.kimDebugMatching.icp_matXw2U = ([]);
+        artoolkit.kimDebugMatching.icp_matXc2U = ([]);
+        artoolkit.kimDebugMatching.icp_matXw2Xc = ([]);
+        artoolkit.kimDebugMatching.icp_dU = ([]);
+        artoolkit.kimDebugMatching.icp_J_U_S = ([]);
+        artoolkit.kimDebugMatching.icp_J_U_Xc = ([]);
+        artoolkit.kimDebugMatching.icp_J_Xc_S = ([]);
+      }
+    });
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 4; i++) {
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            var a = arguments;
+            artoolkit.kimDebugMatching.icp_initMatXw2Xc[a[0]][a[1]] = a[2];
+          }
+        }, j, i, initMatXw2Xc[j][i]);
+      }
+    }
+
     ICP2DCoordT   U;
     ARdouble        *J_U_S;
     ARdouble        *dU, dx, dy;
@@ -80,6 +107,28 @@ int icpPoint( ICPHandleT   *handle,
 #endif
         arUtilMatMul( (const ARdouble (*)[4])handle->matXc2U, (const ARdouble (*)[4])matXw2Xc, matXw2U );
 
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            var a = arguments;
+            artoolkit.kimDebugMatching.icp_matXw2U.push([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+            artoolkit.kimDebugMatching.icp_matXc2U.push([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+            artoolkit.kimDebugMatching.icp_matXw2Xc.push([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+          }
+        });
+
+        for (int j = 0; j < 3; j++) {
+          for (int i = 0; i < 4; i++) {
+            EM_ASM_({
+              if (artoolkit.kimDebugMatching.logICP == true) {
+                var a = arguments;
+                artoolkit.kimDebugMatching.icp_matXw2U[artoolkit.kimDebugMatching.icp_matXw2U.length-1][a[0]][a[1]] = a[2];
+                artoolkit.kimDebugMatching.icp_matXc2U[artoolkit.kimDebugMatching.icp_matXc2U.length-1][a[0]][a[1]] = a[3];
+                artoolkit.kimDebugMatching.icp_matXw2Xc[artoolkit.kimDebugMatching.icp_matXw2Xc.length-1][a[0]][a[1]] = a[4];
+              }
+            }, j, i, matXw2U[j][i], handle->matXc2U[j][i], matXw2Xc[j][i]);
+          }
+        }
+
         err1 = 0.0;
         for( j = 0; j < data->num; j++ ) {
             if( icpGetU_from_X_by_MatX2U( &U, matXw2U, &(data->worldCoord[j]) ) < 0 ) {
@@ -92,6 +141,21 @@ int icpPoint( ICPHandleT   *handle,
             dU[j*2+0] = dx;
             dU[j*2+1] = dy;
         }
+
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            artoolkit.kimDebugMatching.icp_dU.push([]);
+          }
+        });
+        for( j = 0; j < data->num * 2; j++ ) {
+          EM_ASM_({
+            if (artoolkit.kimDebugMatching.logICP == true) {
+              var a = arguments;
+              artoolkit.kimDebugMatching.icp_dU[artoolkit.kimDebugMatching.icp_dU.length-1].push(a[0]);
+            }
+          }, dU[j]);
+        }
+
         err1 /= data->num;
 #if ICP_DEBUG
         ARLOG("Loop[%d]: err = %15.10f\n", i, err1);
@@ -101,11 +165,37 @@ int icpPoint( ICPHandleT   *handle,
         if( i == handle->maxLoop ) break;
         err0 = err1;
 
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            artoolkit.kimDebugMatching.icp_J_U_S.push([]);
+          }
+        });
+
         for( j = 0; j < data->num; j++ ) {
+
             if( icpGetJ_U_S( (ARdouble (*)[6])(&J_U_S[12*j]), handle->matXc2U, matXw2Xc, &(data->worldCoord[j]) ) < 0 ) {
                 icpGetXw2XcCleanup("icpGetJ_U_S", J_U_S, dU);
                 return -1;
             }
+
+            EM_ASM_({
+              if (artoolkit.kimDebugMatching.logICP == true) {
+                var a = arguments;
+                artoolkit.kimDebugMatching.icp_J_U_S[a[0]].push([[], []]);
+              }
+            }, i);
+            for (int ii = 0; ii < 2; ii++) {
+              for (int jj = 0; jj < 6; jj++) {
+                EM_ASM_({
+                  if (artoolkit.kimDebugMatching.logICP == true) {
+                  var a = arguments;
+                    artoolkit.kimDebugMatching.icp_J_U_S[a[0]][a[1]][a[2]][a[3]] = a[4];
+                  }
+                }, i, j, ii, jj, J_U_S[j * 12 + ii * 6 + jj]);
+              }
+            }
+
+
 #if ICP_DEBUG
             icpDispMat( "J_U_S", (ARdouble *)(&J_U_S[j*12]), 2, 6 );
 #endif

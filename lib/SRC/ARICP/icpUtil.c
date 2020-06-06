@@ -96,6 +96,20 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     if( matXc2U[1][3] != 0.0 ) return -1;
     if( matXc2U[2][3] != 0.0 ) return -1;
 
+    EM_ASM_({
+      artoolkit.kimDebugMatching.matXc2U = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+      artoolkit.kimDebugMatching.initMatXw2Xc = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
+      artoolkit.kimDebugMatching.v = ([[null,null,null], [null,null,null], [null,null,null]]);
+      artoolkit.kimDebugMatching.t = ([]);
+      artoolkit.kimDebugMatching.matC = ([]);
+      artoolkit.kimDebugMatching.matA = ([]);
+      artoolkit.kimDebugMatching.matB = ([]);
+      artoolkit.kimDebugMatching.matAt = ([]);
+      artoolkit.kimDebugMatching.matAtA = ([]);
+      artoolkit.kimDebugMatching.matAtB = ([]);
+      artoolkit.kimDebugMatching.matAtAInv = ([]);
+    });
+
     matA = arMatrixAlloc( num*2, 8 );
     if( matA == NULL ) {
         ARLOGe("Error 1: icpGetInitXw2Xc\n");
@@ -130,6 +144,31 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
         matB->m[i*2+1] = screenCoord[i].y;
     }
 
+    for (int i = 0; i < matA->row; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.matA.push([]);
+      });
+      for (int j = 0; j < matA->clm; j++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.matA[a[0]][a[1]] = a[2];
+        }, i, j, matA->m[i * matA->clm + j]);
+      }
+    }
+    for (int i = 0; i < matB->row; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.matB.push([]);
+      });
+      for (int j = 0; j < matB->clm; j++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.matB[a[0]][a[1]] = a[2];
+        }, i, j, matB->m[i * matB->clm + j]);
+      }
+    }
+
     matAt = arMatrixAllocTrans( matA );
     if( matAt == NULL ) {
         arMatrixFree(matA);
@@ -145,6 +184,20 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
         ARLOGe("Error 4: icpGetInitXw2Xc\n");
         return -1;
     }
+
+    for (int i = 0; i < matAtA->row; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.matAtA.push([]);
+      });
+      for (int j = 0; j < matAtA->clm; j++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.matAtA[a[0]][a[1]] = a[2];
+        }, i, j, matAtA->m[i * matAtA->clm + j]);
+      }
+    }
+
     matAtB = arMatrixAllocMul( matAt, matB );
     if( matAtB == NULL ) {
         arMatrixFree(matA);
@@ -163,6 +216,20 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
         ARLOGe("Error 6: icpGetInitXw2Xc\n");
         return -1;
     }
+
+    for (int i = 0; i < matAtA->row; i++) {
+      EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.matAtAInv.push([]);
+      });
+      for (int j = 0; j < matAtA->clm; j++) {
+        EM_ASM_({
+            var a = arguments;
+            artoolkit.kimDebugMatching.matAtAInv[a[0]][a[1]] = a[2];
+        }, i, j, matAtA->m[i * matAtA->clm + j]);
+      }
+    }
+
     matC = arMatrixAllocMul( matAtA, matAtB );
     if( matC == NULL ) {
         arMatrixFree(matA);
@@ -198,13 +265,6 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     t[1]  = (matC->m[5] - matXc2U[1][2] * t[2]) / matXc2U[1][1];
     t[0]  = (matC->m[2] - matXc2U[0][2] * t[2] - matXc2U[0][1] * t[1]) / matXc2U[0][0];
 
-    EM_ASM_({
-      artoolkit.kimDebugMatching.matXc2U = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
-      artoolkit.kimDebugMatching.initMatXw2Xc = ([[null,null,null,null], [null,null,null,null], [null,null,null,null]]);
-      artoolkit.kimDebugMatching.v = ([[null,null,null], [null,null,null], [null,null,null]]);
-      artoolkit.kimDebugMatching.t = ([]);
-      artoolkit.kimDebugMatching.matC = ([]);
-    });
     for (int i = 0; i < 9; i++) {
       EM_ASM_({
           var a = arguments;

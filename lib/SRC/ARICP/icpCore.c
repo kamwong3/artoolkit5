@@ -41,6 +41,8 @@
 #include <AR/ar.h>
 #include <AR/icpCore.h>
 
+#include <emscripten.h>
+
 #ifdef ARDOUBLE_IS_FLOAT
 #  define SQRT sqrtf
 #  define COS cosf
@@ -110,6 +112,33 @@ int icpGetJ_U_S( ARdouble J_U_S[2][6], ARdouble matXc2U[3][4], ARdouble matXw2Xc
 #if ICP_DEBUG
     icpDispMat( "J_U_Xc", (ARdouble *)J_U_Xc, 2, 3 );
 #endif
+
+    EM_ASM_({
+      if (artoolkit.kimDebugMatching.logICP == true) {
+        artoolkit.kimDebugMatching.icp_J_U_Xc.push([[],[]]);
+        artoolkit.kimDebugMatching.icp_J_Xc_S.push([[],[],[]]);
+      }
+    });
+    for( j = 0; j < 2; j++ ) {
+      for( k = 0; k < 3; k++ ) {
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            var a = arguments;
+            artoolkit.kimDebugMatching.icp_J_U_Xc[artoolkit.kimDebugMatching.icp_J_U_Xc.length-1][a[0]][a[1]] = a[2];
+          }
+        }, j, k, J_U_Xc[j][k]); 
+      }
+    }
+    for( j = 0; j < 3; j++ ) {
+      for( k = 0; k < 6; k++ ) {
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            var a = arguments;
+            artoolkit.kimDebugMatching.icp_J_Xc_S[artoolkit.kimDebugMatching.icp_J_Xc_S.length-1][a[0]][a[1]] = a[2];
+          }
+        }, j, k, J_Xc_S[j][k]); 
+      }
+    }
 
     for( j = 0; j < 2; j++ ) {
         for( i = 0; i < 6; i++ ) {
