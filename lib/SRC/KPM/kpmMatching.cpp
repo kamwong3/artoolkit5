@@ -678,8 +678,9 @@ int kpmMatching(KpmHandle *kpmHandle, ARUint8 *inImageLuma)
         }
 
         const vision::matches_t& matches = kpmHandle->freakMatcher->inliers();
+
         int matched_image_id = kpmHandle->freakMatcher->matchedId();
-        if (matched_image_id != 0) { 
+        if (matched_image_id >= 0) { 
             int matchedPageNo = kpmHandle->pageIDs[matched_image_id];
 
             if( !kpmHandle->result[matchedPageNo].skipF ) { 
@@ -821,6 +822,12 @@ int kpmUtilGetPose_binary(ARParamLT *cparamLT, const vision::matches_t &matchDat
         return -1;
     }
 #  else
+
+    EM_ASM_({
+        var a = arguments;
+        artoolkit.kimDebugMatching.logICP = true;
+    });
+
     ARdouble camPosed[3][4];
     if( icpPoint( icpHandle, &icpData, initMatXw2Xc, camPosed, &err ) < 0 ) {
         //ARLOGe("Error!! at icpPoint.\n");
@@ -829,6 +836,11 @@ int kpmUtilGetPose_binary(ARParamLT *cparamLT, const vision::matches_t &matchDat
         icpDeleteHandle( &icpHandle );
         return -1;
     }
+    EM_ASM_({
+        var a = arguments;
+        artoolkit.kimDebugMatching.logICP = false;
+    });
+
     for (int r = 0; r < 3; r++) for (int c = 0; c < 4; c++) camPose[r][c] = (float)camPosed[r][c];
 #  endif
 
