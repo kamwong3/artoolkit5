@@ -43,6 +43,8 @@
 #include <AR2/config.h>
 #include <AR2/template.h>
 
+#include <emscripten.h>
+
 #define  USE_SEARCH1    1
 #define  USE_SEARCH2    1
 #define  USE_SEARCH3    1
@@ -158,9 +160,33 @@ int ar2GetBestMatching( ARUint8 *img, ARUint8 *mfImage, int xsize, int ysize, AR
                     continue;
                 }
                 ret = 0;
+
+                EM_ASM_({
+                  var a = arguments;
+                  var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                  s.matchingCompute.push({
+                    i: a[0],
+                    j: a[1],
+                    wval: a[2],
+                  });
+                }, i, j, wval);
+
                 updateCandidate(i, j, wval, &keep_num, cx, cy, cval);
             }
         }
+    }
+
+    
+    for (int ii = 0; ii < keep_num; ii++) {
+      EM_ASM_({
+        var a = arguments;
+        var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+        s.matchingCandidates.push({
+          cx: a[0],
+          cy: a[1],
+          cval: a[2],
+        });
+      }, cx[ii], cy[ii], cval[ii]);
     }
 
     // Third pass. Determine best candidate.
@@ -204,9 +230,26 @@ int ar2GetBestMatching( ARUint8 *img, ARUint8 *mfImage, int xsize, int ysize, AR
                 for( i = cx[l] - SKIP_INTERVAL; i <= cx[l] + SKIP_INTERVAL; i++ ) {
                     if( i - mtemp->xts1*AR2_TEMP_SCALE <  0     ) continue;
                     if( i + mtemp->xts2*AR2_TEMP_SCALE >= xsize ) break;
+
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      s.bestMatchingCompute.push({
+                        i: a[0],
+                        j: a[1],
+                      });
+                    }, i, j);
+
                     if( ar2GetBestMatchingSubFine(img, xsize, ysize, pixFormat, mtemp, i, j, &wval) < 0 ) {
                         continue;
                     }
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      var m = s.bestMatchingCompute[s.bestMatchingCompute.length-1];
+                      m.wval = a[0];
+                    }, wval);
+
                     if( wval > wval2 ) {
                         *bx    =  i;
                         *by    =  j;
@@ -313,6 +356,24 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                     sum1 += (*p2);
                     sum2 += (*p2) * (*p2);
                     sum3 += (*p2) * (*p1);
+
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      s.matchingComputeSum.push({
+                        i: a[0],
+                        j: a[1],
+                        p1: a[2],
+                        p2: a[3],
+                        sum1: a[4],
+                        sum2: a[5],
+                        sum3: a[6],
+                        p2_y: a[7],
+                        p2_x: a[8],
+                      });
+                    }, i, j, (*p1), (*p2), sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
+
+
                 }
                 p2 += AR2_TEMP_SCALE;
                 p1++;
@@ -330,6 +391,22 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                     sum1 += w;
                     sum2 += w*w;
                     sum3 += w * (*p1);
+
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      s.matchingComputeSum.push({
+                        i: a[0],
+                        j: a[1],
+                        p1: a[2],
+                        p2: a[3],
+                        sum1: a[4],
+                        sum2: a[5],
+                        sum3: a[6],
+                        p2_y: a[7],
+                        p2_x: a[8],
+                      });
+                    }, i, j, (*p1), w, sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
                 }
                 p2 += 3*AR2_TEMP_SCALE;
                 p1++;
@@ -345,6 +422,22 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                     sum1 += w;
                     sum2 += w*w;
                     sum3 += w * (*p1);
+
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      s.matchingComputeSum.push({
+                        i: a[0],
+                        j: a[1],
+                        p1: a[2],
+                        p2: a[3],
+                        sum1: a[4],
+                        sum2: a[5],
+                        sum3: a[6],
+                        p2_y: a[7],
+                        p2_x: a[8],
+                      });
+                    }, i, j, (*p1), w, sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
                 }
                 p2 += 4*AR2_TEMP_SCALE;
                 p1++;

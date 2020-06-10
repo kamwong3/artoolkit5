@@ -42,6 +42,11 @@
 #include <math.h>
 #include <AR2/template.h>
 
+#include <emscripten.h>
+
+// kim use deterministic random
+int randomSeed = 1234;
+
 static int    ar2GetVectorAngle( float  p1[2], float  p2[2], float  *psinf, float  *pcosf );
 static float  ar2GetTriangleArea( float  p1[2], float  p2[2], float  p3[2] );
 static float  ar2GetRegionArea( float  pos[4][2], int q1, int r1, int r2 );
@@ -150,6 +155,15 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
             if( d > dmax ) { dmax = d; j = i; }
         }
 
+        EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.selectTemplate.push({
+            num: a[0],
+            dmax: a[1],
+            j: a[2]
+          });
+        }, num, dmax, j);
+
         if( j != -1 ) candidate[j].flag = 1;
         return j;
     }
@@ -168,6 +182,15 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
               + (candidate[i].sy - pos[0][1])*(candidate[i].sy - pos[0][1]);
             if( d > dmax ) { dmax = d; j = i; }
         }
+
+        EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.selectTemplate.push({
+            num: a[0],
+            dmax: a[1],
+            j: a[2]
+          });
+        }, num, dmax, j);
 
         if( j != -1 ) candidate[j].flag = 1;
         return j;
@@ -188,6 +211,15 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
             d = d * d;
             if( d > dmax ) { dmax = d; j = i; }
         }
+
+        EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.selectTemplate.push({
+            num: a[0],
+            dmax: a[1],
+            j: a[2]
+          });
+        }, num, dmax, j);
 
         if( j != -1 ) candidate[j].flag = 1;
         return j;
@@ -243,6 +275,19 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
             if( s > smax ) { smax = s; j = i; }
        }
 
+        EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.selectTemplate.push({
+            num: a[0],
+            smax: a[1],
+            j: a[2],
+            pos0: [a[3], a[4]],
+            pos1: [a[5], a[6]],
+            pos2: [a[7], a[8]],
+            pos3: [a[9], a[10]],
+          });
+        }, num, smax, j, pos[0][0], pos[0][1], pos[q1][0], pos[q1][1], pos[r1][0], pos[r1][1], pos[r2][0], pos[r2][1]);
+
         if( j != -1 ) candidate[j].flag = 1;
         return j;
     }
@@ -250,6 +295,7 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
     else {
         int     i, j, k;
         static  int s = 0;
+        
 
         for( i = 0; prevFeature[i].flag != -1; i++ ) {
             if( prevFeature[i].flag != 0 ) continue;
@@ -276,7 +322,12 @@ int ar2SelectTemplate( AR2TemplateCandidateT *candidate, AR2TemplateCandidateT *
         }
         if( j == 0 ) return -1;
 
-        k = (int)((float )j * rand() / (RAND_MAX + 1.0F));
+        // kim: use deterministic random for debugging
+        //k = (int)((float )j * rand() / (RAND_MAX + 1.0F));
+        randomSeed = (214013*randomSeed+2531011);
+        k = (randomSeed>>16)&0x7FFF;
+        k = k % j;
+
         for( i = j = 0; candidate[i].flag != -1; i++ ) {
             if( candidate[i].flag != 0 ) continue;
             if( j == k ) {

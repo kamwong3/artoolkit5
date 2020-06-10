@@ -45,6 +45,7 @@
 #include <AR2/template.h>
 #include <AR2/tracking.h>
 
+#include <emscripten.h>
 
 #if AR2_CAPABLE_ADAPTIVE_TEMPLATE
 AR2TemplateT *ar2GenTemplate( int ts1, int ts2 )
@@ -137,10 +138,44 @@ int ar2SetTemplateSub( const ARParamLT *cparamLT, const float  trans[3][4], AR2I
         
         mx = featurePoints->coord[num].mx;
         my = featurePoints->coord[num].my;
+
+        EM_ASM_({
+          var a = arguments;
+          var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+          s.mx = a[0];
+          s.my = a[1];
+          s.trans = ([[],[],[]]);
+          s.wtrans = ([[],[],[]]);
+        }, mx, my);
+        for (int ii = 0; ii < 3; ii++) {
+          for (int jj = 0; jj < 4; jj++) {
+            EM_ASM_({
+              var a = arguments;
+              var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+              s.wtrans[a[0]][a[1]] = a[2];
+              s.trans[a[0]][a[1]] = a[3];
+            }, ii, jj, wtrans[ii][jj], trans[ii][jj]);
+          }
+        }
+
         if( ar2MarkerCoord2ScreenCoord( NULL, (const float (*)[4])wtrans, mx, my, &mx, &my ) < 0 ) return -1;
-        if( arParamIdeal2ObservLTf( &cparamLT->paramLTf, mx, my, &sx, &sy ) < 0 ) return -1;
+
+        // kim disable refinement
+        //if( arParamIdeal2ObservLTf( &cparamLT->paramLTf, mx, my, &sx, &sy ) < 0 ) return -1;
+        sx = mx;
+        sy = my;
+
         ix = (int)(sx + 0.5F);
         iy = (int)(sy + 0.5F);
+
+        EM_ASM_({
+          var a = arguments;
+          var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+          s.sx = a[0];
+          s.sy = a[1];
+          s.ix = a[2];
+          s.iy = a[3];
+        }, sx, sy, ix, iy);
 
         img1 = templ->img1;
         sum = sum2 = 0;
@@ -150,10 +185,13 @@ int ar2SetTemplateSub( const ARParamLT *cparamLT, const float  trans[3][4], AR2I
             ix2 = ix - (templ->xts1)*AR2_TEMP_SCALE;
             for( i = -(templ->xts1); i <= templ->xts2; i++, ix2+=AR2_TEMP_SCALE ) {
 
-                if( arParamObserv2IdealLTf( &cparamLT->paramLTf, (float)ix2, (float)iy2, &sx, &sy) < 0 ) {
-                    *(img1++) = AR2_TEMPLATE_NULL_PIXEL;
-                    continue;
-                }
+                // kim disable refinement
+                //if( arParamObserv2IdealLTf( &cparamLT->paramLTf, (float)ix2, (float)iy2, &sx, &sy) < 0 ) {
+                //    *(img1++) = AR2_TEMPLATE_NULL_PIXEL;
+                //    continue;
+                //}
+                sx = ix2;
+                sy = iy2;
 
                 ret = ar2GetImageValue( NULL, (const float (*)[4])wtrans, imageSet->scale[featurePoints->scale],
 #if AR2_CAPABLE_ADAPTIVE_TEMPLATE
@@ -161,6 +199,19 @@ int ar2SetTemplateSub( const ARParamLT *cparamLT, const float  trans[3][4], AR2I
 #else
                                         sx, sy, &pixel );
 #endif
+
+                EM_ASM_({
+                  var a = arguments;
+                  var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                  s.templateCompute.push({
+                    ix2: a[0],
+                    iy2: a[1],
+                    sx: a[2],
+                    sy: a[3],
+                    pizel: a[4],
+                  });
+                }, ix2, iy2, sx, sy, pixel);
+
                 if( ret < 0 ) {
                     *(img1++) = AR2_TEMPLATE_NULL_PIXEL;
                 }

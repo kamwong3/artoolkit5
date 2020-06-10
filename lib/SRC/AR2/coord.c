@@ -77,6 +77,12 @@ int ar2MarkerCoord2ScreenCoord2( const ARParamLT *cparamLT, const float  trans[3
         return 0;
     }
 
+    // kim start ignore ideal to observe
+    *sx = ix;
+    *sy = iy;
+    return 0;
+    // kim end ignore ideal to observe
+
     if( arParamIdeal2ObservLTf( &cparamLT->paramLTf, ix, iy, sx, sy ) < 0 ) return -1;
     if( arParamObserv2IdealLTf( &cparamLT->paramLTf, *sx, *sy, &ix1, &iy1) < 0 ) return -1;
     if( (ix-ix1)*(ix-ix1) + (iy-iy1)*(iy-iy1) > 1.0F ) return -1;
@@ -119,7 +125,10 @@ int ar2MarkerCoord2ScreenCoord( const ARParamLT *cparamLT, const float  trans[3]
         return 0;
     }
 
-    if( arParamIdeal2ObservLTf( &cparamLT->paramLTf, ix, iy, sx, sy ) < 0 ) return -1;
+    // kim: disable camera adjustment
+    // if( arParamIdeal2ObservLTf( &cparamLT->paramLTf, ix, iy, sx, sy ) < 0 ) return -1;
+    *sx = ix;
+    *sy = iy;
 
     return 0;
 }
