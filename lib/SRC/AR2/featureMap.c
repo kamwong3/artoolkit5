@@ -42,6 +42,8 @@
 #include <AR2/config.h>
 #include <AR2/featureSet.h>
 
+#include <emscripten.h>
+
 static int make_template( ARUint8 *imageBW, int xsize, int ysize,
                           int cx, int cy, int ts1, int ts2, float  sd_thresh,
                           float  *template, float  *vlen );
@@ -164,6 +166,18 @@ AR2FeatureMapT *ar2GenFeatureMap( AR2ImageT *image,
     }
     for( i = 0; i < xsize; i++ ) {*(fp2++) = -1.0f; p++;}
 
+    EM_ASM_({
+      artoolkit.kimDebugData.dValues.push([]);
+    });
+    for (int jj = 0; jj < ysize; jj++) {
+      for (int ii = 0; ii < xsize; ii++) {
+        EM_ASM_({
+          var a = arguments;
+          var dValues = artoolkit.kimDebugData.dValues[artoolkit.kimDebugData.dValues.length-1];
+          dValues.push(a[0]);
+        }, fimage2[jj * xsize + ii]);
+      }
+    }
 
     sum = 0;
     for( i = 0; i < 1000; i++ ) hist[i] = 0;
@@ -181,6 +195,17 @@ AR2FeatureMapT *ar2GenFeatureMap( AR2ImageT *image,
         }
         fp2 += 2;
     }
+
+    EM_ASM_({
+      artoolkit.kimDebugData.hists.push([]);
+    });
+    for (int ii = 0; ii < 1000; ii++) {
+      EM_ASM_({
+        var a = arguments;
+        artoolkit.kimDebugData.hists[artoolkit.kimDebugData.hists.length-1].push(a[0]);
+      }, hist[ii]);
+    }
+
     j = 0;
     for( i = 999; i >= 0; i-- ) {
         j += hist[i];
@@ -224,6 +249,28 @@ AR2FeatureMapT *ar2GenFeatureMap( AR2ImageT *image,
                 continue;
             }
 
+            EM_ASM_({
+                var a = arguments;
+                var t = artoolkit.kimDebugData.featureMapsTemplates[artoolkit.kimDebugData.featureMapsTemplates.length-1];
+                t[a[0]] = ({
+                  vlen: a[1],
+                  template: [],
+                  sims: []
+                });
+            }, j*xsize+i, vlen);
+
+            if (1) {
+              for (int jj = 0; jj < ts1 + ts2 + 1; jj++) {
+                for (int ii = 0; ii < ts1 + ts2 + 1; ii++) {
+                  EM_ASM_({
+                      var a = arguments;
+                      var t = artoolkit.kimDebugData.featureMapsTemplates[artoolkit.kimDebugData.featureMapsTemplates.length-1];
+                      t[a[0]].template.push(a[1]);
+                  }, j*xsize+i, template[jj * (ts1+ts2+1) + ii]);
+                }
+              }
+            }
+
             max = -1.0f;
             for( jj = -search_size1; jj <= search_size1; jj++ ) {
                 for( ii = -search_size1; ii <= search_size1; ii++ ) {
@@ -236,6 +283,15 @@ AR2FeatureMapT *ar2GenFeatureMap( AR2ImageT *image,
 #else
                     if( get_similarity(image->imgBW, xsize, ysize, template, vlen, ts1, ts2, i+ii, j+jj, &sim) < 0 ) continue;
 #endif
+
+                    if (1) {
+                      EM_ASM_({
+                          var a = arguments;
+                          var t = artoolkit.kimDebugData.featureMapsTemplates[artoolkit.kimDebugData.featureMapsTemplates.length-1];
+                          t[a[0]].sims[a[1]] = a[2];
+                      }, j*xsize+i, (jj+search_size1) * (search_size1*2+1) + (ii+search_size1), sim);
+                    }
+
 
                     if( sim > max ) {
                         max = sim;
@@ -318,14 +374,15 @@ AR2FeatureCoordT *ar2SelectFeature( AR2ImageT *image, AR2FeatureMapT *featureMap
         }
         if( cx == -1 ) break;
 
+
 #if AR2_CAPABLE_ADAPTIVE_TEMPLATE
         if( make_template( image->imgBWBlur[1], xsize, ysize, cx, cy, ts1, ts2, 0.0, template, &vlen ) < 0 ) {
 #else
         if( make_template( image->imgBW, xsize, ysize, cx, cy, ts1, ts2, 0.0, template, &vlen ) < 0 ) {
 #endif
-            fimage2[cy*xsize+cx] = 1.0f;
             continue;
         }
+
         if( vlen/(ts1+ts2+1) < sd_thresh ) {
             fimage2[cy*xsize+cx] = 1.0f;
             continue;
