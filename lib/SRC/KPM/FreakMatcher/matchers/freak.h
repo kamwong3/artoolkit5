@@ -43,6 +43,8 @@
 #include <detectors/interpolate.h>
 #include "feature_store.h"
 
+#include <emscripten.h>
+
 namespace vision {
     
 // DEFINE this to enable bilinar interpolation when sampling intensity values
@@ -399,14 +401,37 @@ namespace vision {
      * Compute the descriptor given the 37 samples from each receptor.
      */
     inline void CompareFREAK84(unsigned char desc[84], const float samples[37]) {
+        EM_ASM_({
+            if (!artoolkit.kimDebugData.compareFreak) artoolkit.kimDebugData.compareFreak = [];
+            if (!artoolkit.kimDebugData.compareFreakDesc) artoolkit.kimDebugData.compareFreakDesc = [];
+            artoolkit.kimDebugData.compareFreak.push([]);
+            artoolkit.kimDebugData.compareFreakDesc.push([]);
+        });
+
         int pos = 0;
         ZeroVector(desc, 84);
         for(int i = 0; i < 37; i++) {
             for(int j = i+1; j < 37; j++) {
                 bitstring_set_bit(desc, pos, samples[i] < samples[j]);
+
+                EM_ASM_({
+                    var a = arguments;
+                    var f = artoolkit.kimDebugData.compareFreak[artoolkit.kimDebugData.compareFreak.length-1];
+                    f.push(a[0]);
+                }, samples[i] < samples[j]);
+
                 pos++;
             }
         }
+
+        for (int i = 0; i < 84; i++) {
+          EM_ASM_({
+              var a = arguments;
+              var f = artoolkit.kimDebugData.compareFreakDesc[artoolkit.kimDebugData.compareFreakDesc.length-1];
+              f.push(a[0]);
+          }, desc[i]);
+        }
+
         ASSERT(pos == 666, "Position is not within range");
     }
     

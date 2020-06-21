@@ -42,6 +42,8 @@
 #include <functional>
 #include "interpolate.h"
 
+#include <emscripten.h>
+
 using namespace vision;
 
 DoGPyramid::DoGPyramid()
@@ -160,6 +162,29 @@ void DoGScaleInvariantDetector::detect(const GaussianScaleSpacePyramid* pyramid)
     TIMED("Subpixel") {
         findSubpixelLocations(pyramid);
     }
+
+    EM_ASM_({
+        if (!artoolkit.kimDebugData.featurePoints2) artoolkit.kimDebugData.featurePoints2 = [];
+        artoolkit.kimDebugData.featurePoints2.push([]);
+    });
+    for(int i = 0; i < mFeaturePoints.size(); i++) {
+        FeaturePoint& kp = mFeaturePoints[i];
+        EM_ASM_({
+            var a = arguments;
+            var fps = artoolkit.kimDebugData.featurePoints2[artoolkit.kimDebugData.featurePoints2.length-1];
+            fps.push({
+                x: a[0],
+                y: a[1],
+                octave: a[2],
+                scale: a[3],
+                score: a[4],
+                sigma: a[5],
+                edgeScore: a[6],
+                spScale: a[7],
+                angle: a[8],
+            });
+        }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma, kp.edge_score, kp.sp_scale, kp.angle);
+    }
     
     // Prune features
     TIMED("pruneFeatures") {
@@ -169,6 +194,29 @@ void DoGScaleInvariantDetector::detect(const GaussianScaleSpacePyramid* pyramid)
     // Compute dominant angles
     TIMED("Find Orientations") {
         findFeatureOrientations(pyramid);
+    }
+
+    EM_ASM_({
+        if (!artoolkit.kimDebugData.featurePoints4) artoolkit.kimDebugData.featurePoints4 = [];
+        artoolkit.kimDebugData.featurePoints4.push([]);
+    });
+    for(int i = 0; i < mFeaturePoints.size(); i++) {
+        FeaturePoint& kp = mFeaturePoints[i];
+        EM_ASM_({
+            var a = arguments;
+            var fps = artoolkit.kimDebugData.featurePoints4[artoolkit.kimDebugData.featurePoints4.length-1];
+            fps.push({
+                x: a[0],
+                y: a[1],
+                octave: a[2],
+                scale: a[3],
+                score: a[4],
+                sigma: a[5],
+                edgeScore: a[6],
+                spScale: a[7],
+                angle: a[8],
+            });
+        }, kp.x, kp.y, kp.octave, kp.scale, kp.score, kp.sigma, kp.edge_score, kp.sp_scale, kp.angle);
     }
 }
 
@@ -652,9 +700,14 @@ namespace vision {
                 if(n == 0) {
                     continue;
                 }
-                std::nth_element(bucket.begin(),
-                                 bucket.begin()+n,
-                                 bucket.end(), std::greater<std::pair<float, size_t> >());
+
+                // kim: use full sort to make result more debuggable
+                if (bucket.size() > n) {
+                  std::sort(bucket.begin(), bucket.end(), std::greater<std::pair<float, size_t> >());
+                }
+                //std::nth_element(bucket.begin(),
+                //                bucket.begin()+n,
+                //                bucket.end(), std::greater<std::pair<float, size_t> >());
                 
                 DEBUG_BLOCK(
                             if(n > bucket.size()) {

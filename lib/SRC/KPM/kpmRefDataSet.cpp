@@ -49,6 +49,7 @@
 #include <KPM/surfSub.h>
 #endif
 
+#include <emscripten.h>
 
 
 int kpmGenRefDataSet ( ARUint8 *refImage, int xsize, int ysize, float dpi, int procMode, int compMode, int maxFeatureNum,
@@ -274,6 +275,37 @@ int kpmGenRefDataSet ( ARUint8 *refImage, int xsize, int ysize, float dpi, int p
     else {
         refDataSet->refPoint = NULL;
     }
+
+    EM_ASM_({
+        if (!artoolkit.kimDebugData.refDataSet) artoolkit.kimDebugData.refDataSet = [];
+        artoolkit.kimDebugData.refDataSet.push([]);
+    });
+    for(int i = 0 ; i < refDataSet->num ; i++ ) {
+      KpmRefData rd = refDataSet->refPoint[i];
+      EM_ASM_({
+          var a = arguments;
+          var set = artoolkit.kimDebugData.refDataSet[artoolkit.kimDebugData.refDataSet.length-1];
+          set.push({
+            x2D: a[0],
+            y2D: a[1],
+            x3D: a[2],
+            y3D: a[3],
+            angle: a[4],
+            scale: a[5],
+            maxima: a[6],
+            descriptors: ([]),
+          });
+      }, rd.coord2D.x, rd.coord2D.y, rd.coord3D.x, rd.coord3D.y, rd.featureVec.angle, rd.featureVec.scale, rd.featureVec.maxima);
+
+      for(int j = 0; j < FREAK_SUB_DIMENSION; j++ ) {
+        EM_ASM_({
+            var a = arguments;
+            var set = artoolkit.kimDebugData.refDataSet[artoolkit.kimDebugData.refDataSet.length-1];
+            set[set.length-1].descriptors.push(a[0]);
+        }, rd.featureVec.v[j]);
+      }
+    }
+
     free(refImageBW);
 #if !BINARY_FEATURE
     surfSubDeleteHandle( &surfHandle );
