@@ -41,6 +41,8 @@
 
 #include "gaussian_scale_space_pyramid.h"
 
+#include <emscripten.h>
+
 namespace vision {
     
     /**
@@ -151,6 +153,19 @@ namespace vision {
         ASSERT(w2 >= 0, "w2 must be positive");        
         ASSERT(b1 >= 0 && b1 < num_bins, "b1 bin index out of range");
         ASSERT(b2 >= 0 && b2 < num_bins, "b2 bin index out of range");
+
+        EM_ASM_({
+            var a = arguments;
+            var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+            var o = os[os.length-1];
+            o.fbinDetails[o.fbinDetails.length-1] = ({
+              b1: a[0],
+              b2: a[1],
+              w1: a[2],
+              w2: a[3],
+              magnitude: a[4],
+            });
+        }, b1, b2, w1, w2, magnitude);
         
         // Vote to 2 weighted bins
         hist[b1] += w1*magnitude;

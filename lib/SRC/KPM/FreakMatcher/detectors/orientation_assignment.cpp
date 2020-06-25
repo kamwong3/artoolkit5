@@ -42,6 +42,8 @@
 #include <math/math_utils.h>
 #include <math/math_io.h>
 
+#include <emscripten.h>
+
 using namespace vision;
 
 OrientationAssignment::OrientationAssignment()
@@ -115,6 +117,24 @@ void OrientationAssignment::compute(float* angles,
     int x1, y1;
     float max_height;
     float gw_sigma, gw_scale;
+
+    EM_ASM_({
+        var a = arguments;
+        var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+        os.push({
+          x: a[0],
+          y: a[1],
+          sigma: a[2],
+          octave: a[3],
+          scale: a[4],
+          histograms: [],
+          smoothedHistograms: [],
+          histfbins: [],
+          histAs: [],
+          histBs: [],
+          histCs: [],
+        });
+    }, x, y, sigma, octave, scale);
     
     ASSERT(x >= 0, "x must be positive");
     ASSERT(x < mGradients[octave*mNumScalesPerOctave+scale].width(), "x must be less than the image width");
@@ -145,7 +165,10 @@ void OrientationAssignment::compute(float* angles,
     
     // Radius of the support region
     radius  = mSupportRegionExpansionFactor*gw_sigma;
-    radius2 = std::ceil(sqr(radius));
+
+    // kim fix: more consistent rounding for debug
+    radius2 = std::ceil(sqr(radius) - 0.5);
+    //radius2 = std::ceil(sqr(radius));
     
     // Box around feature point
     x0 = xi-(int)(radius+0.5f);
@@ -161,6 +184,20 @@ void OrientationAssignment::compute(float* angles,
     
     // Zero out the orientation histogram
     ZeroVector(&mHistogram[0], mHistogram.size());
+
+    EM_ASM_({
+        var a = arguments;
+        var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+        var o = os[os.length-1];
+        o.y0 = a[0];
+        o.y1 = a[1];
+        o.x0 = a[2];
+        o.x1 = a[3];
+        o.fbins = ([]);
+        o.fbinDetails = ([]);
+        o.radius = a[4];
+        o.radius2 = a[5];
+    }, y0, y1, x0, x1, radius, radius2);
     
     // Build up the orientation histogram
     for(int yp = y0; yp <= y1; yp++) {
@@ -171,12 +208,23 @@ void OrientationAssignment::compute(float* angles,
         const float* y_ptr = g.get<float>(yp);
         
         for(int xp = x0; xp <= x1; xp++) {
+            EM_ASM_({
+                var a = arguments;
+                var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+                var o = os[os.length-1];
+                o.fbins.push(null);
+                o.fbinDetails.push(null);
+            });
+
             //float dx = xp-x;
             float dx = xp-xi; //KIM FIX 
             float r2 = sqr(dx)+dy2;
             
             // Only use the gradients within the circular window
-            if(r2 > radius2) {
+            
+            // kim fix, rounding error
+            if ( (int)r2 > (int)radius2 ) {
+            // if(r2 > radius2) {
                 continue;
             }
             
@@ -189,10 +237,26 @@ void OrientationAssignment::compute(float* angles,
             
             // Compute the sub-bin location
             float fbin  = mNumBins*angle*ONE_OVER_2PI;
+
+            EM_ASM_({
+                var a = arguments;
+                var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+                var o = os[os.length-1];
+                o.fbins[o.fbins.length-1] = a[0];
+            }, fbin);
             
             // Vote to the orientation histogram with a bilinear update
             bilinear_histogram_update(&mHistogram[0], fbin, w*mag, mNumBins);
         }
+    }
+
+    for (int i = 0; i < mHistogram.size(); i++) {
+      EM_ASM_({
+          var a = arguments;
+          var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+          var o = os[os.length-1];
+          o.histograms.push(a[0]);
+      }, mHistogram[i]);
     }
     
     // The orientation histogram is smoothed with a Gaussian
@@ -203,6 +267,15 @@ void OrientationAssignment::compute(float* angles,
             0.451862761877606f,
             0.274068619061197f};
         SmoothOrientationHistogram(&mHistogram[0], &mHistogram[0], mNumBins, kernel);
+    }
+
+    for (int i = 0; i < mHistogram.size(); i++) {
+      EM_ASM_({
+          var a = arguments;
+          var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+          var o = os[os.length-1];
+          o.smoothedHistograms.push(a[0]);
+      }, mHistogram[i]);
     }
     
     // Find the peak of the histogram.
@@ -226,18 +299,31 @@ void OrientationAssignment::compute(float* angles,
         const float pp1[] = {(float)(i+1), mHistogram[(i+1+mNumBins)%mNumBins]};
         
         // Ensure that "p0" is a relative peak w.r.t. the two neighbors
-        if((mHistogram[i] > mPeakThreshold*max_height) && (p0[1] > pm1[1]) && (p0[1] > pp1[1])) {
+        
+        // Kim fix: avoid to sensitive to precision error. add 0.0001
+        if((mHistogram[i] > mPeakThreshold*max_height) && (p0[1] > pm1[1] + 0.0001) && (p0[1] > pp1[1] + 0.0001)) {
+        //if((mHistogram[i] > mPeakThreshold*max_height) && (p0[1] > pm1[1]) && (p0[1] > pp1[1])) {
             float A, B, C, fbin;
             
             // The default sub-pixel bin location is the discrete location if the quadratic
             // fitting fails.
             fbin = i;
-            
+
             // Fit a quatratic to the three bins
             if(Quadratic3Points(A, B, C, pm1, p0, pp1)) {
                 // If "QuadraticCriticalPoint" fails, then "fbin" is not updated.
                 QuadraticCriticalPoint(fbin, A, B, C);
             }
+
+            EM_ASM_({
+                var a = arguments;
+                var os = artoolkit.kimDebugData.orientationCompute[artoolkit.kimDebugData.orientationCompute.length-1];
+                var o = os[os.length-1];
+                o.histfbins[a[0]] = a[1];
+                o.histAs[a[0]] = a[1];
+                o.histBs[a[0]] = a[2];
+                o.histCs[a[0]] = a[3];
+            }, i, fbin, A, B, C);
             
             // The sub-pixel angle needs to be in the range [0,2*pi)
             angles[num_angles] = std::fmod((2.f*PI)*((fbin+0.5f+(float)mNumBins)/(float)mNumBins), 2.f*PI);

@@ -190,6 +190,11 @@ void DoGScaleInvariantDetector::detect(const GaussianScaleSpacePyramid* pyramid)
     TIMED("pruneFeatures") {
         pruneFeatures();
     }
+
+    EM_ASM_({
+        if (!artoolkit.kimDebugData.orientationCompute) artoolkit.kimDebugData.orientationCompute = [];
+        artoolkit.kimDebugData.orientationCompute.push([]);
+    });
     
     // Compute dominant angles
     TIMED("Find Orientations") {
@@ -495,6 +500,9 @@ void DoGScaleInvariantDetector::extractFeatures(const GaussianScaleSpacePyramid*
 }
 
 void DoGScaleInvariantDetector::pruneFeatures() {
+    // kim comment: pruning is per bucket. if all 501 points in bucket 1, all points are returned. 
+    //   if however all 500 points in bucket 1, turns out only 5 points are returned.
+    //   maybe remove this checking
     if(mFeaturePoints.size() <= mMaxNumFeaturePoints) {
         return;
     }

@@ -351,7 +351,7 @@ namespace vision {
               homography.w.push(a[0]);
           }, w[i]);
         }
-        for (int i = 0; i < 72; i++) {
+        for (int i = 0; i < 81; i++) {
           EM_ASM_({
               var a = arguments;
               var keyframe = artoolkit.kimDebugMatching.querykeyframes[artoolkit.kimDebugMatching.querykeyframes.length-1];

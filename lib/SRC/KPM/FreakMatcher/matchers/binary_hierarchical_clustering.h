@@ -346,6 +346,10 @@ namespace vision {
             if (!artoolkit.kimDebugMatching) artoolkit.kimDebugMatching = {};
             if (!artoolkit.kimDebugMatching.clusters) artoolkit.kimDebugMatching.clusters = [];
             artoolkit.kimDebugMatching.clusters.push([]);
+
+            if (!artoolkit.kimDebugData) artoolkit.kimDebugData = {};
+            if (!artoolkit.kimDebugData.clusters) artoolkit.kimDebugData.clusters = ([]);
+            artoolkit.debugClusterStack = [];
         });
         debugNode(mRoot.get());
     }
@@ -354,25 +358,38 @@ namespace vision {
     void BinaryHierarchicalClustering<NUM_BYTES_PER_FEATURE>::debugNode(const node_t* node) {
         EM_ASM_({
             var a = arguments;
-            var cluster = artoolkit.kimDebugMatching.clusters[artoolkit.kimDebugMatching.clusters.length-1];
-            cluster.push({
-              leaf: a[0],
-              reverseIndexes: [],
-              mCenterDesc: []
+            artoolkit.debugCurrentCluster = ({
+              isLeaf: a[0],
+              pointIndexes: [],
+              children: [],
             });
         }, node->leaf());
 
         for (int i = 0; i < node->reverseIndex().size(); i++) {
           EM_ASM_({
               var a = arguments;
-              var cluster = artoolkit.kimDebugMatching.clusters[artoolkit.kimDebugMatching.clusters.length-1];
-              cluster[cluster.length-1].reverseIndexes.push(a[0]);
+              artoolkit.debugCurrentCluster.pointIndexes.push(a[0]);
           }, node->reverseIndex()[i]);
         }
 
+        EM_ASM_({
+            if (artoolkit.debugClusterStack.length === 0) {
+              artoolkit.kimDebugData.clusters.push(artoolkit.debugCurrentCluster);
+              artoolkit.kimDebugMatching.clusters.push(artoolkit.debugCurrentCluster);
+            } else {
+              artoolkit.debugClusterStack[artoolkit.debugClusterStack.length-1].children.push(artoolkit.debugCurrentCluster);
+            }
+        });
+
+        EM_ASM_({
+          artoolkit.debugClusterStack.push(artoolkit.debugCurrentCluster);
+        });
         for (int i = 0; i < node->children().size(); i++) {
           debugNode(node->children()[i]);
         }
+        EM_ASM_({
+          artoolkit.debugClusterStack.pop();
+        });
     }
     
     template<int NUM_BYTES_PER_FEATURE>

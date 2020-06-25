@@ -134,6 +134,7 @@ void FREAKExtractor::layout84(std::vector<receptor>& receptors,
 void FREAKExtractor::extract(BinaryFeatureStore& store,
                              const GaussianScaleSpacePyramid* pyramid,
                              const std::vector<FeaturePoint>& points) {
+
 #ifdef FREAK_DEBUG
     mMappedPoints0.clear();
     mMappedPoints1.clear();

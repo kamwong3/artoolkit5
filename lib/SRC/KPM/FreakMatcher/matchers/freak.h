@@ -172,7 +172,19 @@ namespace vision {
         // Downsample the point to the octave
         bilinear_downsample_point(xp, yp, x, y, octave);
         // Sample the receptor
-        return SampleReceptor(image, xp, yp);
+        float r = SampleReceptor(image, xp, yp);
+
+        EM_ASM_({
+            var a = arguments;
+            var f = artoolkit.kimDebugData.freakSamples[artoolkit.kimDebugData.freakSamples.length-1];
+            f.push({
+              xp: a[0],
+              yp: a[1],
+              value: a[2]
+            });
+        }, xp, yp, r);
+
+        return r;
     }
     
     /**
@@ -226,7 +238,12 @@ namespace vision {
         float sc, s0, s1, s2, s3, s4, s5;
         
         int octave, scale;
-        
+
+        EM_ASM_({
+            if (!artoolkit.kimDebugData.freakSamples) artoolkit.kimDebugData.freakSamples = [];
+            artoolkit.kimDebugData.freakSamples.push([]);
+        });
+            
         // Ensure the scale of the similarity transform is at least "1".
         float transform_scale = point.scale*expansion_factor;
         if(transform_scale < 1) {
@@ -412,13 +429,15 @@ namespace vision {
         ZeroVector(desc, 84);
         for(int i = 0; i < 37; i++) {
             for(int j = i+1; j < 37; j++) {
-                bitstring_set_bit(desc, pos, samples[i] < samples[j]);
+                // kim: avoid too sensitive to rounding precision
+                //bitstring_set_bit(desc, pos, samples[i] < samples[j]);
+                bitstring_set_bit(desc, pos, samples[i] < samples[j] + 0.0001);
 
                 EM_ASM_({
                     var a = arguments;
                     var f = artoolkit.kimDebugData.compareFreak[artoolkit.kimDebugData.compareFreak.length-1];
                     f.push(a[0]);
-                }, samples[i] < samples[j]);
+                }, samples[i] < samples[j] + 0.0001);
 
                 pos++;
             }
