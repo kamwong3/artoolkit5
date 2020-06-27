@@ -446,7 +446,11 @@ static int icpGetQ_from_S( ARdouble q[7], ARdouble s[6] )
     ARdouble    ra;
 
     ra = s[0]*s[0] + s[1]*s[1] + s[2]*s[2];
-    if( ra == 0.0 ) {
+
+    // kim fix: 
+    //if( ra == 0.0 ) {
+    if( ra < 0.000001 ) {
+
         q[0] = 1.0;
         q[1] = 0.0;
         q[2] = 0.0;

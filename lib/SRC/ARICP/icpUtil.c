@@ -247,7 +247,7 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     //               [ 0  0  1]  
     //
     //             [h0 h1 h2] 
-    // matC = H = [h3 h4 h5]
+    // matC = H =  [h3 h4 h5]
     //             [h6 h7  1]
     //
     // [R|t] = K^-1 H
@@ -312,7 +312,7 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
     t[0] /= (l1+l2)/_2_0;
     t[1] /= (l1+l2)/_2_0;
     t[2] /= (l1+l2)/_2_0;
-    if( t[2] < 0.0 ) {
+    if( t[2] < 0.0 ) { // kim doesn't seems possible. t[2] is set at 1.0 at the beginning
         v[0][0] = -v[0][0];
         v[0][1] = -v[0][1];
         v[0][2] = -v[0][2];
@@ -324,7 +324,9 @@ int icpGetInitXw2Xc_from_PlanarData( ARdouble       matXc2U[3][4],
         t[2] = -t[2];
     }
 
-    check_rotation( v );
+    // Kim disable check_rotation. not sure what it does and doesn't seems to give good result
+    // check_rotation( v );
+
     v[2][0] = v[0][1]*v[1][2] - v[0][2]*v[1][1];
     v[2][1] = v[0][2]*v[1][0] - v[0][0]*v[1][2];
     v[2][2] = v[0][0]*v[1][1] - v[0][1]*v[1][0];
