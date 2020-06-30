@@ -41,6 +41,8 @@
 #include <AR/ar.h>
 #include <AR/icp.h>
 
+#include <emscripten.h>
+
 #ifndef ARDOUBLE_IS_FLOAT
 #define     K2_FACTOR     4.0
 #else
@@ -65,6 +67,11 @@ int icpPointRobust( ICPHandleT   *handle,
     ARdouble        err0, err1;
     int           inlierNum;
     int           i, j, k;
+
+    EM_ASM_({
+      if (!artoolkit.kimDebugMatching.icp_robust) artoolkit.kimDebugMatching.icp_robust = [];
+      artoolkit.kimDebugMatching.icp_robust.push([]);
+    });
 
     if( data->num < 4 ) return -1;
 
@@ -119,6 +126,27 @@ int icpPointRobust( ICPHandleT   *handle,
         K2 = E2[inlierNum] * K2_FACTOR;
         if( K2 < 16.0 ) K2 = 16.0;
 
+        EM_ASM_({
+          var a = arguments;
+          artoolkit.kimDebugMatching.icp_robust[artoolkit.kimDebugMatching.icp_robust.length-1].push({
+            E: [],
+            E2: [],
+            dU: [],
+            J_U_S: [],
+            W: [],
+          });
+        });
+
+        for( j = 0; j < data->num; j++ ) {
+          EM_ASM_({
+            var a = arguments;
+            var rs = artoolkit.kimDebugMatching.icp_robust[artoolkit.kimDebugMatching.icp_robust.length-1];
+            var r = rs[rs.length-1];
+            r.E.push(a[0]);
+            r.E2.push(a[1]);
+          }, E[j], E2[j]);
+        }
+
         err1 = 0.0;
         for( j = 0; j < data->num; j++ ) {
             if( E2[j] > K2 ) err1 += K2/6.0;
@@ -160,6 +188,25 @@ int icpPointRobust( ICPHandleT   *handle,
                 J_U_S[k*6+11] *= W;
                 dU[k+0] = dU[j*2+0] * W;
                 dU[k+1] = dU[j*2+1] * W;
+
+                EM_ASM_({
+                  var a = arguments;
+                  var rs = artoolkit.kimDebugMatching.icp_robust[artoolkit.kimDebugMatching.icp_robust.length-1];
+                  var r = rs[rs.length-1];
+                  r.dU.push(a[0]);
+                  r.dU.push(a[1]);
+                  r.W.push(a[2]);
+                }, dU[k+0], dU[k+1], W);
+
+                for (int kk = 0; kk < 12; kk++) {
+                  EM_ASM_({
+                    var a = arguments;
+                    var rs = artoolkit.kimDebugMatching.icp_robust[artoolkit.kimDebugMatching.icp_robust.length-1];
+                    var r = rs[rs.length-1];
+                    r.J_U_S.push(a[0])
+                  }, J_U_S[k*6 + kk]);
+                }
+
                 k+=2;
             }
         }

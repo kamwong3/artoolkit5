@@ -41,6 +41,9 @@
 #include <AR2/imageSet.h>
 #include <AR2/coord.h>
 
+#include <emscripten.h>
+#include <math.h> 
+
 int ar2MarkerCoord2ScreenCoord2( const ARParamLT *cparamLT, const float  trans[3][4], const float  mx, const float  my, float  *sx, float  *sy )
 {
     float   wtrans[3][4];
@@ -149,7 +152,11 @@ int ar2ScreenCoord2MarkerCoord( const ARParamLT *cparamLT, const float  trans[3]
         b2  = trans[1][3] - trans[2][3] * sy;
     }
     else {
-        if( arParamObserv2IdealLTf( &cparamLT->paramLTf, sx, sy, &ix, &iy) < 0 ) return -1;
+        // kim disable camera adjust
+        // if( arParamObserv2IdealLTf( &cparamLT->paramLTf, sx, sy, &ix, &iy) < 0 ) return -1;
+        ix = sx;
+        iy = sy;
+
         arUtilMatMuldff( cparamLT->param.mat, trans, wtrans );
         c11 = wtrans[2][0] * ix - wtrans[0][0];
         c12 = wtrans[2][1] * ix - wtrans[0][1];
@@ -236,13 +243,35 @@ int ar2GetImageValue( const ARParamLT *cparamLT, const float trans[3][4], const 
 
     if( ar2ScreenCoord2MarkerCoord( cparamLT, trans, sx, sy, &mx, &my ) < 0 ) return -1;
     
-    ix = (int)(mx * image->dpi / 25.4F + 0.5F);
+    // kim fix: negative number not convert correctly
+    //ix = (int)(mx * image->dpi / 25.4F + 0.5F);
+    ix = (int) (floor(mx * image->dpi / 25.4F + 0.5F));
+
     if( ix < 0 || ix >= image->xsize ) return -1;
 
-    iy = (int)(image->ysize - my * image->dpi / 25.4F + 0.5F);
+    // kim fix: negative number not convert correctly
+    //iy = (int)(image->ysize - my * image->dpi / 25.4F + 0.5F);
+    iy = (int) (floor(image->ysize - my * image->dpi / 25.4F + 0.5F));
     if( iy < 0 || iy >= image->ysize ) return -1;
 
     *pBW = image->imgBW[iy*image->xsize+ix];
+
+    EM_ASM_({
+      var a = arguments;
+      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+      s.templateCompute.push({
+      });
+    });
+
+    EM_ASM_({
+      var a = arguments;
+      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+      var c = s.templateCompute[s.templateCompute.length-1];
+      c.ix = a[0];
+      c.iy = a[1];
+      c.mx = a[2];
+      c.my = a[3];
+    }, ix, iy, mx, my);
 
     return 0;
 }

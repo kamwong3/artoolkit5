@@ -370,6 +370,7 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                         sum3: a[6],
                         p2_y: a[7],
                         p2_x: a[8],
+                        type: 'mono',
                       });
                     }, i, j, (*p1), (*p2), sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
 
@@ -405,6 +406,7 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                         sum3: a[6],
                         p2_y: a[7],
                         p2_x: a[8],
+                        type: 'rgb',
                       });
                     }, i, j, (*p1), w, sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
                 }
@@ -436,6 +438,7 @@ static int ar2GetBestMatchingSubFine( ARUint8 *img, int xsize, int ysize, AR_PIX
                         sum3: a[6],
                         p2_y: a[7],
                         p2_x: a[8],
+                        type: 'rgba',
                       });
                     }, i, j, (*p1), w, sum1, sum2, sum3, sy + j*AR2_TEMP_SCALE, sx + i*AR2_TEMP_SCALE);
                 }

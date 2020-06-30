@@ -193,6 +193,7 @@ int ar2SetTemplateSub( const ARParamLT *cparamLT, const float  trans[3][4], AR2I
                 sx = ix2;
                 sy = iy2;
 
+
                 ret = ar2GetImageValue( NULL, (const float (*)[4])wtrans, imageSet->scale[featurePoints->scale],
 #if AR2_CAPABLE_ADAPTIVE_TEMPLATE
                                        sx, sy, blurLevel, &pixel );
@@ -200,22 +201,19 @@ int ar2SetTemplateSub( const ARParamLT *cparamLT, const float  trans[3][4], AR2I
                                         sx, sy, &pixel );
 #endif
 
-                EM_ASM_({
-                  var a = arguments;
-                  var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
-                  s.templateCompute.push({
-                    ix2: a[0],
-                    iy2: a[1],
-                    sx: a[2],
-                    sy: a[3],
-                    pizel: a[4],
-                  });
-                }, ix2, iy2, sx, sy, pixel);
-
                 if( ret < 0 ) {
                     *(img1++) = AR2_TEMPLATE_NULL_PIXEL;
                 }
                 else {
+                    EM_ASM_({
+                      var a = arguments;
+                      var s = artoolkit.kimDebugMatching.tracking2dSub[artoolkit.kimDebugMatching.tracking2dSub.length-1];
+                      var c = s.templateCompute[s.templateCompute.length-1];
+                      c.sx = a[0];
+                      c.sy = a[1];
+                      c.pixel = a[2];
+                    }, sx, sy, pixel);
+
                     *(img1++) = pixel;
                     sum  += pixel;
                     sum2 += pixel*pixel;

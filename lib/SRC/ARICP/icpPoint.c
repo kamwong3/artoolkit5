@@ -66,6 +66,7 @@ int icpPoint( ICPHandleT   *handle,
         artoolkit.kimDebugMatching.icp_J_U_Xc = ([]);
         artoolkit.kimDebugMatching.icp_J_Xc_S = ([]);
         artoolkit.kimDebugMatching.icp_dS = ([]);
+        artoolkit.kimDebugMatching.icp_err1 = ([]);
       }
     });
     for (int j = 0; j < 3; j++) {
@@ -161,6 +162,15 @@ int icpPoint( ICPHandleT   *handle,
 #if ICP_DEBUG
         ARLOG("Loop[%d]: err = %15.10f\n", i, err1);
 #endif
+
+        EM_ASM_({
+          if (artoolkit.kimDebugMatching.logICP == true) {
+            var a = arguments;
+            artoolkit.kimDebugMatching.icp_err1.push(a[0]);
+          }
+        }, err1);
+
+
         if( err1 < handle->breakLoopErrorThresh ) break;
         if( i > 0 && err1 < handle->breakLoopErrorThresh2 && err1/err0 > handle->breakLoopErrorRatioThresh ) break;
         if( i == handle->maxLoop ) break;

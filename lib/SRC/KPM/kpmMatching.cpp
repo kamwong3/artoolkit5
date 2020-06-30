@@ -879,7 +879,9 @@ int kpmUtilGetPose_binary(ARParamLT *cparamLT, const vision::matches_t &matchDat
     free( wCoord );
     
     *error = (float)err;
-    if( *error > 10.0f ) return -1;
+
+    // kim: this number seems problematic, should it be relative to some size?
+    // if( *error > 10.0f ) return -1;
     
     return 0;
 }
