@@ -80,7 +80,7 @@ all: ${LIBOBJS}
 	#(cd Image; make -f Makefile)
 	#(cd Video4Linux2; make -f Makefile)
 	#(cd libdc1394; make -f Makefile)
-	#(cd Video/GStreamer; make -f Makefile)
+	(cd GStreamer; make -f Makefile)
 
 ${LIBOBJS}:	${INCLUDE}
 
@@ -93,7 +93,7 @@ ${LIBOBJS}:	${INCLUDE}
 	#(cd Image; make -f Makefile)
 	#(cd Video4Linux2; make -f Makefile)
 	#(cd libdc1394; make -f Makefile)
-	#(cd GStreamer; make -f Makefile)
+	(cd GStreamer; make -f Makefile)
 
 clean:
 	rm -f *.o

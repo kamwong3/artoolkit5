@@ -36,15 +36,15 @@
 
 all:
 	(cd mk_patt;          make -f Makefile)
-	(cd 1394;             make -f Makefile)
+#	(cd 1394;             make -f Makefile)
 	(cd check_id;         make -f Makefile)
 	(cd genTexData;       make -f Makefile)
 	(cd genMarkerSet;     make -f Makefile)
 	(cd dispImageSet;     make -f Makefile)
 	(cd dispFeatureSet;   make -f Makefile)
 	(cd checkResolution;  make -f Makefile)
-	(cd calib_optical;    make -f Makefile)
-	(cd calib_stereo;     make -f Makefile)
+#	(cd calib_optical;    make -f Makefile)
+#	(cd calib_stereo;     make -f Makefile)
 
 clean:
 	(cd mk_patt;          make -f Makefile clean)
