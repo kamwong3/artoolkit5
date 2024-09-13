@@ -146,8 +146,8 @@ static void mainLoop(void)
     cv::Mat cornersMat;
     cornerFlag = cv::findChessboardCorners(cvarrToMat(calibImage), cvSize(chessboardCornerNumY,chessboardCornerNumX),
                                            cornersMat, CV_CALIB_CB_ADAPTIVE_THRESH|CV_CALIB_CB_FILTER_QUADS );
-    corners = (CvPoint2D32f*)cornersMat.data;
     cornerCount = cornersMat.total();
+    memcpy(corners, cornersMat.data, cornerCount * sizeof(CvPoint2D32f));
     
     if(cornerFlag) glColor4ub(255, 0, 0, 255);
     else           glColor4ub(0, 255, 0, 255);
