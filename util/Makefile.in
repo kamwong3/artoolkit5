@@ -44,8 +44,8 @@ all:
 	(cd dispFeatureSet;   make -f Makefile)
 	(cd checkResolution;  make -f Makefile)
 #   (cd calib_camera;     make -f Makefile)
-	(cd calib_optical;    make -f Makefile)
-	(cd calib_stereo;     make -f Makefile)
+#	(cd calib_optical;    make -f Makefile)
+#	(cd calib_stereo;     make -f Makefile)
 
 clean:
 	(cd mk_patt;          make -f Makefile clean)
