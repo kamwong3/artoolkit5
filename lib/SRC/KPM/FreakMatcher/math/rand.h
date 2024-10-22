@@ -46,9 +46,9 @@ namespace vision {
      *
      * http://software.intel.com/en-us/articles/fast-random-number-generator-on-the-intel-pentiumr-4-processor/
      */
-    inline int FastRandom(int& seed) {
+    inline unsigned int FastRandom(int& seed) {
         seed = (214013*seed+2531011);
-        return (seed>>16)&0x7FFF;
+        return (unsigned int)((seed>>16)&0x7FFF);
     }
     
     /**
@@ -70,7 +70,7 @@ namespace vision {
     template<typename T>
     inline void ArrayShuffle(T* v, int pop_size, int sample_size, int& seed) {
         for(int i = 0; i < sample_size; i++) {
-            int k = FastRandom(seed)%pop_size;
+            unsigned int k = FastRandom(seed)%pop_size;
             std::swap(v[i], v[k]);
         }
     }
