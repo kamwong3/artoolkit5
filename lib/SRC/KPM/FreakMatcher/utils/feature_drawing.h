@@ -41,10 +41,10 @@
 #include <matchers/feature_matcher.h>
 #include <matchers/freak.h>
 
-#ifdef USE_OPENCV
-#  include <opencv2/opencv.hpp>
-#  include <opencv2/highgui/highgui.hpp>
-#endif
+// #ifdef USE_OPENCV
+// #  include <opencv2/opencv.hpp>
+// #  include <opencv2/highgui/highgui.hpp>
+// #endif
 
 #include <math/indexing.h>
 #include <math/matrix.h>

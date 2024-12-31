@@ -52,9 +52,9 @@
 
 #include "feature_point.h"
 
-#ifdef USE_OPENCV
-#  include <opencv2/calib3d/calib3d.hpp>
-#endif
+// #ifdef USE_OPENCV
+// #  include <opencv2/calib3d/calib3d.hpp>
+// #endif
 
 namespace vision {
 

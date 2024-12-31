@@ -38,9 +38,9 @@
 #include "image.h"
 #include <cmath>
 
-#ifdef USE_OPENCV
-#  include <opencv2/opencv.hpp>
-#endif
+// #ifdef USE_OPENCV
+// #  include <opencv2/opencv.hpp>
+// #endif
 
 namespace vision {
 
@@ -59,41 +59,41 @@ namespace vision {
             return false;
         }
         
-#ifdef USE_OPENCV
-        static cv::Mat toOpenCV(Image& im) {
-            int type = -1;
+// #ifdef USE_OPENCV
+//         static cv::Mat toOpenCV(Image& im) {
+//             int type = -1;
             
-            switch(im.type()) {
-                case vision::IMAGE_UINT8:
-                    type = CV_8UC((int)im.channels());
-                    break;
-                case vision::IMAGE_F32:
-                    type = CV_32FC((int)im.channels());
-                    break;
-                default:
-                    return cv::Mat();
-            }
+//             switch(im.type()) {
+//                 case vision::IMAGE_UINT8:
+//                     type = CV_8UC((int)im.channels());
+//                     break;
+//                 case vision::IMAGE_F32:
+//                     type = CV_32FC((int)im.channels());
+//                     break;
+//                 default:
+//                     return cv::Mat();
+//             }
             
-            cv::Mat opencv_im((int)im.height(),
-                              (int)im.width(),
-                              type,
-                              im.get(),
-                              im.step());
+//             cv::Mat opencv_im((int)im.height(),
+//                               (int)im.width(),
+//                               type,
+//                               im.get(),
+//                               im.step());
             
-            return opencv_im;
-        }
+//             return opencv_im;
+//         }
         
-        static Image toImage(cv::Mat& im) {
-            switch(im.type()) {
-                case CV_8U:
-                    break;
-                default:
-                    return Image();
-            };
+//         static Image toImage(cv::Mat& im) {
+//             switch(im.type()) {
+//                 case CV_8U:
+//                     break;
+//                 default:
+//                     return Image();
+//             };
             
-            return Image(im.data, IMAGE_UINT8, im.cols, im.rows, (int)im.step, im.channels());
-        }
-#endif
+//             return Image(im.data, IMAGE_UINT8, im.cols, im.rows, (int)im.step, im.channels());
+//         }
+// #endif
         
     };
     
